@@ -1,0 +1,1182 @@
+{
+ "source": "Derived from Week-01 'Flat file NF1 to NF3 Example.xlsx' (Online Shop); corrected and extended.",
+ "steps": [
+  {
+   "id": "unf",
+   "tables": [
+    {
+     "name": "online_shop_orders (spreadsheet)",
+     "tag": "UNF",
+     "cols": [
+      {
+       "n": "order_no",
+       "pk": false,
+       "fk": false
+      },
+      {
+       "n": "order_date",
+       "pk": false,
+       "fk": false
+      },
+      {
+       "n": "status",
+       "pk": false,
+       "fk": false
+      },
+      {
+       "n": "customer (name, address)",
+       "pk": false,
+       "fk": false
+      },
+      {
+       "n": "contact",
+       "pk": false,
+       "fk": false
+      },
+      {
+       "n": "area",
+       "pk": false,
+       "fk": false
+      },
+      {
+       "n": "items ordered",
+       "pk": false,
+       "fk": false
+      }
+     ],
+     "rows": [
+      [
+       "1001",
+       "2025-09-25",
+       "Delivered",
+       "Jane Morris, 28 High Road, Southampton SO19 8JK",
+       "jane.morris@example.com / 07700 900101",
+       "Hampshire, England",
+       [
+        "Cola 330ml can £0.80 | Drinks (VAT 20%) | Fizz & Co Drinks 020 7946 0101 | qty 1",
+        "White Bread 800g £1.50 | Bakery (VAT 0%) | Solent Bakery Ltd 01632 960002 | qty 2"
+       ]
+      ],
+      [
+       "1002",
+       "2025-09-26",
+       "Delivered",
+       "George Harris, 15 Middle Road, Witney OX29 0HM",
+       "george.harris@example.com / 07700 900102",
+       "Oxfordshire, England",
+       [
+        "Sparkling Water 500ml £0.60 | Drinks (VAT 20%) | Fizz & Co Drinks 020 7946 0101 | qty 2",
+        "Butter 250g £1.99 | Dairy (VAT 0%) | Meadow Dairy 01632 960005 | qty 5"
+       ]
+      ],
+      [
+       "1003",
+       "2025-10-10",
+       "Delivered",
+       "Andy Green, 15 Middle Road, London EC1A 1BB",
+       "andy.green@example.com / 07700 900103",
+       "City of London, England",
+       [
+        "Olive Oil 750ml £5.50 | Food Cupboard (VAT 0%) | Home Foods Ltd 0118 496 0003 | qty 1",
+        "Margherita Pizza 500g £5.20 | Frozen (VAT 0%) | Best Products Ltd 0121 496 0004 | qty 3"
+       ]
+      ],
+      [
+       "1004",
+       "2025-11-10",
+       "Delivered",
+       "Jane Morris, 28 High Road, Southampton SO19 8JK",
+       "jane.morris@example.com / 07700 900101",
+       "Hampshire, England",
+       [
+        "Cola 330ml can £0.80 | Drinks (VAT 20%) | Fizz & Co Drinks 020 7946 0101 | qty 4",
+        "Margherita Pizza 500g £5.20 | Frozen (VAT 0%) | Best Products Ltd 0121 496 0004 | qty 1"
+       ]
+      ]
+     ],
+     "multi": [
+      3,
+      4,
+      5,
+      6
+     ]
+    }
+   ]
+  },
+  {
+   "id": "1nf",
+   "tables": [
+    {
+     "name": "order_line_1nf",
+     "tag": "1NF",
+     "cols": [
+      {
+       "n": "order_no",
+       "pk": true,
+       "fk": false
+      },
+      {
+       "n": "product",
+       "pk": true,
+       "fk": false
+      },
+      {
+       "n": "order_date",
+       "pk": false,
+       "fk": false
+      },
+      {
+       "n": "status",
+       "pk": false,
+       "fk": false
+      },
+      {
+       "n": "first_name",
+       "pk": false,
+       "fk": false
+      },
+      {
+       "n": "last_name",
+       "pk": false,
+       "fk": false
+      },
+      {
+       "n": "email",
+       "pk": false,
+       "fk": false
+      },
+      {
+       "n": "phone",
+       "pk": false,
+       "fk": false
+      },
+      {
+       "n": "address_line",
+       "pk": false,
+       "fk": false
+      },
+      {
+       "n": "postcode",
+       "pk": false,
+       "fk": false
+      },
+      {
+       "n": "county",
+       "pk": false,
+       "fk": false
+      },
+      {
+       "n": "country",
+       "pk": false,
+       "fk": false
+      },
+      {
+       "n": "price",
+       "pk": false,
+       "fk": false
+      },
+      {
+       "n": "category",
+       "pk": false,
+       "fk": false
+      },
+      {
+       "n": "vat_rate",
+       "pk": false,
+       "fk": false
+      },
+      {
+       "n": "supplier",
+       "pk": false,
+       "fk": false
+      },
+      {
+       "n": "supplier_phone",
+       "pk": false,
+       "fk": false
+      },
+      {
+       "n": "qty",
+       "pk": false,
+       "fk": false
+      }
+     ],
+     "rows": [
+      [
+       1001,
+       "Cola 330ml can",
+       "2025-09-25",
+       "Delivered",
+       "Jane",
+       "Morris",
+       "jane.morris@example.com",
+       "07700 900101",
+       "28 High Road, Southampton",
+       "SO19 8JK",
+       "Hampshire",
+       "England",
+       "0.80",
+       "Drinks",
+       "20%",
+       "Fizz & Co Drinks",
+       "020 7946 0101",
+       1
+      ],
+      [
+       1001,
+       "White Bread 800g",
+       "2025-09-25",
+       "Delivered",
+       "Jane",
+       "Morris",
+       "jane.morris@example.com",
+       "07700 900101",
+       "28 High Road, Southampton",
+       "SO19 8JK",
+       "Hampshire",
+       "England",
+       "1.50",
+       "Bakery",
+       "0%",
+       "Solent Bakery Ltd",
+       "01632 960002",
+       2
+      ],
+      [
+       1002,
+       "Sparkling Water 500ml",
+       "2025-09-26",
+       "Delivered",
+       "George",
+       "Harris",
+       "george.harris@example.com",
+       "07700 900102",
+       "15 Middle Road, Witney",
+       "OX29 0HM",
+       "Oxfordshire",
+       "England",
+       "0.60",
+       "Drinks",
+       "20%",
+       "Fizz & Co Drinks",
+       "020 7946 0101",
+       2
+      ],
+      [
+       1002,
+       "Butter 250g",
+       "2025-09-26",
+       "Delivered",
+       "George",
+       "Harris",
+       "george.harris@example.com",
+       "07700 900102",
+       "15 Middle Road, Witney",
+       "OX29 0HM",
+       "Oxfordshire",
+       "England",
+       "1.99",
+       "Dairy",
+       "0%",
+       "Meadow Dairy",
+       "01632 960005",
+       5
+      ],
+      [
+       1003,
+       "Olive Oil 750ml",
+       "2025-10-10",
+       "Delivered",
+       "Andy",
+       "Green",
+       "andy.green@example.com",
+       "07700 900103",
+       "15 Middle Road, London",
+       "EC1A 1BB",
+       "City of London",
+       "England",
+       "5.50",
+       "Food Cupboard",
+       "0%",
+       "Home Foods Ltd",
+       "0118 496 0003",
+       1
+      ],
+      [
+       1003,
+       "Margherita Pizza 500g",
+       "2025-10-10",
+       "Delivered",
+       "Andy",
+       "Green",
+       "andy.green@example.com",
+       "07700 900103",
+       "15 Middle Road, London",
+       "EC1A 1BB",
+       "City of London",
+       "England",
+       "5.20",
+       "Frozen",
+       "0%",
+       "Best Products Ltd",
+       "0121 496 0004",
+       3
+      ],
+      [
+       1004,
+       "Cola 330ml can",
+       "2025-11-10",
+       "Delivered",
+       "Jane",
+       "Morris",
+       "jane.morris@example.com",
+       "07700 900101",
+       "28 High Road, Southampton",
+       "SO19 8JK",
+       "Hampshire",
+       "England",
+       "0.80",
+       "Drinks",
+       "20%",
+       "Fizz & Co Drinks",
+       "020 7946 0101",
+       4
+      ],
+      [
+       1004,
+       "Margherita Pizza 500g",
+       "2025-11-10",
+       "Delivered",
+       "Jane",
+       "Morris",
+       "jane.morris@example.com",
+       "07700 900101",
+       "28 High Road, Southampton",
+       "SO19 8JK",
+       "Hampshire",
+       "England",
+       "5.20",
+       "Frozen",
+       "0%",
+       "Best Products Ltd",
+       "0121 496 0004",
+       1
+      ]
+     ],
+     "redundant": [
+      [
+       "order_no",
+       [
+        "order_date",
+        "status",
+        "email"
+       ]
+      ],
+      [
+       "email",
+       [
+        "first_name",
+        "last_name",
+        "phone",
+        "address_line",
+        "postcode"
+       ]
+      ],
+      [
+       "postcode",
+       [
+        "county",
+        "country"
+       ]
+      ],
+      [
+       "product",
+       [
+        "price",
+        "category",
+        "supplier"
+       ]
+      ],
+      [
+       "category",
+       [
+        "vat_rate"
+       ]
+      ],
+      [
+       "supplier",
+       [
+        "supplier_phone"
+       ]
+      ]
+     ]
+    }
+   ],
+   "fds": [
+    {
+     "lhs": "order_no, product",
+     "rhs": "qty",
+     "kind": "full"
+    },
+    {
+     "lhs": "order_no",
+     "rhs": "order_date, status, email",
+     "kind": "partial"
+    },
+    {
+     "lhs": "product",
+     "rhs": "price, category, supplier",
+     "kind": "partial"
+    },
+    {
+     "lhs": "email",
+     "rhs": "first_name, last_name, phone, address_line, postcode",
+     "kind": "transitive",
+     "via": "order_no → email"
+    },
+    {
+     "lhs": "postcode",
+     "rhs": "county, country",
+     "kind": "transitive",
+     "via": "order_no → email → postcode"
+    },
+    {
+     "lhs": "category",
+     "rhs": "vat_rate",
+     "kind": "transitive",
+     "via": "product → category"
+    },
+    {
+     "lhs": "supplier",
+     "rhs": "supplier_phone",
+     "kind": "transitive",
+     "via": "product → supplier"
+    }
+   ]
+  },
+  {
+   "id": "2nf",
+   "tables": [
+    {
+     "name": "orders_2nf",
+     "tag": "2NF",
+     "cols": [
+      {
+       "n": "order_no",
+       "pk": true,
+       "fk": false
+      },
+      {
+       "n": "order_date",
+       "pk": false,
+       "fk": false
+      },
+      {
+       "n": "status",
+       "pk": false,
+       "fk": false
+      },
+      {
+       "n": "first_name",
+       "pk": false,
+       "fk": false
+      },
+      {
+       "n": "last_name",
+       "pk": false,
+       "fk": false
+      },
+      {
+       "n": "email",
+       "pk": false,
+       "fk": false
+      },
+      {
+       "n": "phone",
+       "pk": false,
+       "fk": false
+      },
+      {
+       "n": "address_line",
+       "pk": false,
+       "fk": false
+      },
+      {
+       "n": "postcode",
+       "pk": false,
+       "fk": false
+      },
+      {
+       "n": "county",
+       "pk": false,
+       "fk": false
+      },
+      {
+       "n": "country",
+       "pk": false,
+       "fk": false
+      }
+     ],
+     "rows": [
+      [
+       1001,
+       "2025-09-25",
+       "Delivered",
+       "Jane",
+       "Morris",
+       "jane.morris@example.com",
+       "07700 900101",
+       "28 High Road, Southampton",
+       "SO19 8JK",
+       "Hampshire",
+       "England"
+      ],
+      [
+       1002,
+       "2025-09-26",
+       "Delivered",
+       "George",
+       "Harris",
+       "george.harris@example.com",
+       "07700 900102",
+       "15 Middle Road, Witney",
+       "OX29 0HM",
+       "Oxfordshire",
+       "England"
+      ],
+      [
+       1003,
+       "2025-10-10",
+       "Delivered",
+       "Andy",
+       "Green",
+       "andy.green@example.com",
+       "07700 900103",
+       "15 Middle Road, London",
+       "EC1A 1BB",
+       "City of London",
+       "England"
+      ],
+      [
+       1004,
+       "2025-11-10",
+       "Delivered",
+       "Jane",
+       "Morris",
+       "jane.morris@example.com",
+       "07700 900101",
+       "28 High Road, Southampton",
+       "SO19 8JK",
+       "Hampshire",
+       "England"
+      ]
+     ],
+     "redundant": [
+      [
+       "email",
+       [
+        "first_name",
+        "last_name",
+        "phone",
+        "address_line",
+        "postcode"
+       ]
+      ],
+      [
+       "postcode",
+       [
+        "county",
+        "country"
+       ]
+      ]
+     ]
+    },
+    {
+     "name": "product_2nf",
+     "tag": "2NF",
+     "cols": [
+      {
+       "n": "product",
+       "pk": true,
+       "fk": false
+      },
+      {
+       "n": "price",
+       "pk": false,
+       "fk": false
+      },
+      {
+       "n": "category",
+       "pk": false,
+       "fk": false
+      },
+      {
+       "n": "vat_rate",
+       "pk": false,
+       "fk": false
+      },
+      {
+       "n": "supplier",
+       "pk": false,
+       "fk": false
+      },
+      {
+       "n": "supplier_phone",
+       "pk": false,
+       "fk": false
+      }
+     ],
+     "rows": [
+      [
+       "Cola 330ml can",
+       "0.80",
+       "Drinks",
+       "20%",
+       "Fizz & Co Drinks",
+       "020 7946 0101"
+      ],
+      [
+       "White Bread 800g",
+       "1.50",
+       "Bakery",
+       "0%",
+       "Solent Bakery Ltd",
+       "01632 960002"
+      ],
+      [
+       "Sparkling Water 500ml",
+       "0.60",
+       "Drinks",
+       "20%",
+       "Fizz & Co Drinks",
+       "020 7946 0101"
+      ],
+      [
+       "Butter 250g",
+       "1.99",
+       "Dairy",
+       "0%",
+       "Meadow Dairy",
+       "01632 960005"
+      ],
+      [
+       "Olive Oil 750ml",
+       "5.50",
+       "Food Cupboard",
+       "0%",
+       "Home Foods Ltd",
+       "0118 496 0003"
+      ],
+      [
+       "Margherita Pizza 500g",
+       "5.20",
+       "Frozen",
+       "0%",
+       "Best Products Ltd",
+       "0121 496 0004"
+      ]
+     ],
+     "redundant": [
+      [
+       "category",
+       [
+        "vat_rate"
+       ]
+      ],
+      [
+       "supplier",
+       [
+        "supplier_phone"
+       ]
+      ]
+     ]
+    },
+    {
+     "name": "order_line_2nf",
+     "tag": "2NF",
+     "cols": [
+      {
+       "n": "order_no",
+       "pk": true,
+       "fk": true
+      },
+      {
+       "n": "product",
+       "pk": true,
+       "fk": true
+      },
+      {
+       "n": "qty",
+       "pk": false,
+       "fk": false
+      }
+     ],
+     "rows": [
+      [
+       1001,
+       "Cola 330ml can",
+       1
+      ],
+      [
+       1001,
+       "White Bread 800g",
+       2
+      ],
+      [
+       1002,
+       "Sparkling Water 500ml",
+       2
+      ],
+      [
+       1002,
+       "Butter 250g",
+       5
+      ],
+      [
+       1003,
+       "Olive Oil 750ml",
+       1
+      ],
+      [
+       1003,
+       "Margherita Pizza 500g",
+       3
+      ],
+      [
+       1004,
+       "Cola 330ml can",
+       4
+      ],
+      [
+       1004,
+       "Margherita Pizza 500g",
+       1
+      ]
+     ]
+    }
+   ],
+   "fds": [
+    {
+     "lhs": "email",
+     "rhs": "first_name, last_name, phone, address_line, postcode",
+     "kind": "transitive"
+    },
+    {
+     "lhs": "postcode",
+     "rhs": "county, country",
+     "kind": "transitive"
+    },
+    {
+     "lhs": "category",
+     "rhs": "vat_rate",
+     "kind": "transitive"
+    },
+    {
+     "lhs": "supplier",
+     "rhs": "supplier_phone",
+     "kind": "transitive"
+    }
+   ]
+  },
+  {
+   "id": "3nf",
+   "tables": [
+    {
+     "name": "customer",
+     "tag": "3NF",
+     "cols": [
+      {
+       "n": "customer_id",
+       "pk": true,
+       "fk": false
+      },
+      {
+       "n": "first_name",
+       "pk": false,
+       "fk": false
+      },
+      {
+       "n": "last_name",
+       "pk": false,
+       "fk": false
+      },
+      {
+       "n": "email",
+       "pk": false,
+       "fk": false
+      },
+      {
+       "n": "phone",
+       "pk": false,
+       "fk": false
+      },
+      {
+       "n": "address_line",
+       "pk": false,
+       "fk": false
+      },
+      {
+       "n": "postcode",
+       "pk": false,
+       "fk": true
+      }
+     ],
+     "rows": [
+      [
+       1,
+       "Jane",
+       "Morris",
+       "jane.morris@example.com",
+       "07700 900101",
+       "28 High Road, Southampton",
+       "SO19 8JK"
+      ],
+      [
+       2,
+       "George",
+       "Harris",
+       "george.harris@example.com",
+       "07700 900102",
+       "15 Middle Road, Witney",
+       "OX29 0HM"
+      ],
+      [
+       3,
+       "Andy",
+       "Green",
+       "andy.green@example.com",
+       "07700 900103",
+       "15 Middle Road, London",
+       "EC1A 1BB"
+      ]
+     ]
+    },
+    {
+     "name": "postcode_area",
+     "tag": "3NF",
+     "cols": [
+      {
+       "n": "postcode",
+       "pk": true,
+       "fk": false
+      },
+      {
+       "n": "county",
+       "pk": false,
+       "fk": false
+      },
+      {
+       "n": "country",
+       "pk": false,
+       "fk": false
+      }
+     ],
+     "rows": [
+      [
+       "SO19 8JK",
+       "Hampshire",
+       "England"
+      ],
+      [
+       "OX29 0HM",
+       "Oxfordshire",
+       "England"
+      ],
+      [
+       "EC1A 1BB",
+       "City of London",
+       "England"
+      ]
+     ]
+    },
+    {
+     "name": "orders",
+     "tag": "3NF",
+     "cols": [
+      {
+       "n": "order_no",
+       "pk": true,
+       "fk": false
+      },
+      {
+       "n": "order_date",
+       "pk": false,
+       "fk": false
+      },
+      {
+       "n": "status",
+       "pk": false,
+       "fk": false
+      },
+      {
+       "n": "customer_id",
+       "pk": false,
+       "fk": true
+      }
+     ],
+     "rows": [
+      [
+       1001,
+       "2025-09-25",
+       "Delivered",
+       1
+      ],
+      [
+       1002,
+       "2025-09-26",
+       "Delivered",
+       2
+      ],
+      [
+       1003,
+       "2025-10-10",
+       "Delivered",
+       3
+      ],
+      [
+       1004,
+       "2025-11-10",
+       "Delivered",
+       1
+      ]
+     ]
+    },
+    {
+     "name": "category",
+     "tag": "3NF",
+     "cols": [
+      {
+       "n": "category_id",
+       "pk": true,
+       "fk": false
+      },
+      {
+       "n": "category",
+       "pk": false,
+       "fk": false
+      },
+      {
+       "n": "vat_rate",
+       "pk": false,
+       "fk": false
+      }
+     ],
+     "rows": [
+      [
+       1,
+       "Drinks",
+       "20%"
+      ],
+      [
+       2,
+       "Bakery",
+       "0%"
+      ],
+      [
+       3,
+       "Dairy",
+       "0%"
+      ],
+      [
+       4,
+       "Food Cupboard",
+       "0%"
+      ],
+      [
+       5,
+       "Frozen",
+       "0%"
+      ]
+     ]
+    },
+    {
+     "name": "supplier",
+     "tag": "3NF",
+     "cols": [
+      {
+       "n": "supplier_id",
+       "pk": true,
+       "fk": false
+      },
+      {
+       "n": "supplier",
+       "pk": false,
+       "fk": false
+      },
+      {
+       "n": "supplier_phone",
+       "pk": false,
+       "fk": false
+      }
+     ],
+     "rows": [
+      [
+       1,
+       "Fizz & Co Drinks",
+       "020 7946 0101"
+      ],
+      [
+       2,
+       "Solent Bakery Ltd",
+       "01632 960002"
+      ],
+      [
+       3,
+       "Meadow Dairy",
+       "01632 960005"
+      ],
+      [
+       4,
+       "Home Foods Ltd",
+       "0118 496 0003"
+      ],
+      [
+       5,
+       "Best Products Ltd",
+       "0121 496 0004"
+      ]
+     ]
+    },
+    {
+     "name": "product",
+     "tag": "3NF",
+     "cols": [
+      {
+       "n": "product_id",
+       "pk": true,
+       "fk": false
+      },
+      {
+       "n": "product",
+       "pk": false,
+       "fk": false
+      },
+      {
+       "n": "price",
+       "pk": false,
+       "fk": false
+      },
+      {
+       "n": "category_id",
+       "pk": false,
+       "fk": true
+      },
+      {
+       "n": "supplier_id",
+       "pk": false,
+       "fk": true
+      }
+     ],
+     "rows": [
+      [
+       1,
+       "Cola 330ml can",
+       "0.80",
+       1,
+       1
+      ],
+      [
+       2,
+       "White Bread 800g",
+       "1.50",
+       2,
+       2
+      ],
+      [
+       3,
+       "Sparkling Water 500ml",
+       "0.60",
+       1,
+       1
+      ],
+      [
+       4,
+       "Butter 250g",
+       "1.99",
+       3,
+       3
+      ],
+      [
+       5,
+       "Olive Oil 750ml",
+       "5.50",
+       4,
+       4
+      ],
+      [
+       6,
+       "Margherita Pizza 500g",
+       "5.20",
+       5,
+       5
+      ]
+     ]
+    },
+    {
+     "name": "order_line",
+     "tag": "3NF",
+     "cols": [
+      {
+       "n": "order_no",
+       "pk": true,
+       "fk": true
+      },
+      {
+       "n": "product_id",
+       "pk": true,
+       "fk": true
+      },
+      {
+       "n": "qty",
+       "pk": false,
+       "fk": false
+      }
+     ],
+     "rows": [
+      [
+       1001,
+       1,
+       1
+      ],
+      [
+       1001,
+       2,
+       2
+      ],
+      [
+       1002,
+       3,
+       2
+      ],
+      [
+       1002,
+       4,
+       5
+      ],
+      [
+       1003,
+       5,
+       1
+      ],
+      [
+       1003,
+       6,
+       3
+      ],
+      [
+       1004,
+       1,
+       4
+      ],
+      [
+       1004,
+       6,
+       1
+      ]
+     ]
+    }
+   ],
+   "fds": []
+  }
+ ]
+}

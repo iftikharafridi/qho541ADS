@@ -1,0 +1,1127 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Week 1 · Normalisation &amp; ER diagrams · QHO541</title>
+<meta name="description" content="QHO541 Week 1: data and information, relational and NoSQL databases, keys, anomalies, functional dependencies, normalisation from UNF to 3NF, ER diagrams in Crow's Foot and Chen notation, and building the Online Shop database in SQLite.">
+<script>(function(){var p="auto";try{p=localStorage.getItem("qho541.theme")||"auto"}catch(e){}var d=p==="dark"||(p==="auto"&&window.matchMedia&&matchMedia("(prefers-color-scheme: dark)").matches);document.documentElement.setAttribute("data-theme",d?"dark":"light")})();</script>
+<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../assets/vendor/codemirror/codemirror.css">
+<link rel="stylesheet" href="../assets/css/site.css">
+</head>
+<body data-root="../" data-page="week01">
+<a class="skip-link" href="#content">Skip to content</a>
+<header class="site-header" id="site-header"></header>
+<div class="layout">
+  <nav class="sidebar" id="sidebar" aria-label="Course navigation"></nav>
+  <div class="scrim"></div>
+  <div class="main">
+    <main class="content" id="content">
+      <div class="breadcrumb"><a href="../index.html">Home</a> / Week 1</div>
+      <div class="hero">
+        <div class="eyebrow">Week 1 · Database design</div>
+        <h1>Normalisation and ER diagrams</h1>
+        <p class="lede">Turn a messy spreadsheet of online orders into a well-designed relational database: find the dependencies, normalise to third normal form, draw the design in Crow’s Foot and Chen notation, and build it in SQLite.</p>
+        <ul class="meta-row">
+          <li class="chip">Lecture ≈ 2 hours</li><li class="chip">Seminar ≈ 2 hours</li>
+          <li class="chip assess">Assessment: Part 1 (30%)</li><li class="chip">Database: shop_v1</li>
+        </ul>
+      </div>
+
+      <div class="tabs" role="tablist" aria-label="Lesson sections">
+        <button class="tab" role="tab" id="tab-lecture" aria-controls="panel-lecture" data-part="lecture"><span class="dot"></span>Lecture</button>
+        <button class="tab" role="tab" id="tab-seminar" aria-controls="panel-seminar" data-part="seminar"><span class="dot"></span>Seminar</button>
+        <button class="tab" role="tab" id="tab-selfcheck" aria-controls="panel-selfcheck" data-part="quiz"><span class="dot"></span>Self-check</button>
+        <button class="tab" role="tab" id="tab-resources" aria-controls="panel-resources">Resources</button>
+      </div>
+
+<!-- =========================================================== LECTURE -->
+      <div class="tabpanel" role="tabpanel" id="panel-lecture" aria-labelledby="tab-lecture">
+
+<section class="lsec">
+  <h2 id="overview">This week at a glance</h2>
+  <h3 id="outcomes">Learning outcomes</h3>
+  <p>By the end of this week you should be able to:</p>
+  <ol>
+    <li>Distinguish <strong>data</strong> from <strong>information</strong> and explain what a database management system does.</li>
+    <li>Compare <strong>relational</strong> and <strong>NoSQL</strong> databases and say when each is appropriate.</li>
+    <li>Identify <strong>primary, candidate, composite, surrogate and foreign keys</strong> and the integrity rules they enforce.</li>
+    <li>Identify <strong>functional dependencies</strong> and explain update, insertion and deletion <strong>anomalies</strong>.</li>
+    <li><strong>Normalise</strong> a flat file from UNF to 3NF, justifying each step.</li>
+    <li>Draw and read <strong>ER diagrams</strong> in <strong>Crow’s Foot</strong> and <strong>Chen</strong> notation, including cardinality and participation.</li>
+    <li><strong>Map</strong> an ER diagram to SQLite tables with appropriate integrity constraints, and query it from Python.</li>
+  </ol>
+  <h3 id="motivation">Why this matters</h3>
+  <p>Most business data starts life in a spreadsheet. A small online shop might keep one sheet with a row per order: the customer’s name, address and phone, then each product, its price and supplier. It works until the shop grows. A customer moves house and the address is updated in one row but not in the other twelve, so a parcel goes to the wrong address. A product is discontinued, the rows that mention it are deleted, and the only record of its supplier goes with them. A data-protection request asks for everything held about one person, and it is scattered across hundreds of rows.</p>
+  <p>Normalisation is the systematic way to remove these problems <em>before</em> they happen, and an ER diagram is how database professionals communicate the result to clients, developers and examiners. Everything else in this module (triggers, views, the Tkinter application, XML backups) sits on top of the design you make this week. A weak design makes every later task harder.</p>
+  <div class="callout assess"><p class="callout-title">Assessment connection: Part 1 (30%)</p>
+    <p>This week supports every Part 1 criterion: the <strong>flat file</strong> (5 marks), the <strong>ERD with normalisation from 1NF to 3NF</strong> (10), the <strong>SQLite database</strong> (5) and <strong>tables with referential integrity</strong> (5). The requirements analysis (5) is covered again in Week 12. See the <a href="../assessment.html#structure">assessment guide</a>.</p></div>
+  <h3 id="prerequisites">Before you start</h3>
+  <p>You should be comfortable with basic SQL (<code>SELECT … FROM … WHERE</code>, <code>INSERT</code>) and basic Python (variables, functions, loops). If you need a refresher, open the playground below and run it, then change the <code>WHERE</code> condition.</p>
+  <div class="playground" data-db="shop_v1" data-title="Warm-up: basic SELECT">
+<script type="text/plain" class="pg-sql">
+-- Products cheaper than £2, cheapest first
+SELECT product_id, name, price
+FROM product
+WHERE price < 2.00
+ORDER BY price;
+</script>
+  </div>
+</section>
+
+<section class="lsec">
+  <h2 id="data-information">Data, information and the DBMS</h2>
+  <dl class="terms">
+    <dt>Data</dt><dd>Raw, unorganised facts with no context: <code>1001</code>, <code>2025-09-25</code>, <code>0.80</code>, <code>4</code>.</dd>
+    <dt>Information</dt><dd>Data that has been processed, organised and put into context so that it is meaningful and useful for a decision: “Jane Morris has placed three orders since September; her last one is still pending.”</dd>
+  </dl>
+  <figure>
+    <div class="diagram">
+      <svg viewBox="0 0 860 170" role="img" aria-labelledby="di-t">
+        <title id="di-t">Data is processed into information that supports decisions</title>
+        <defs><marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" fill="var(--text-soft)"/></marker></defs>
+        <g font-size="13">
+          <rect x="10" y="30" width="190" height="110" rx="10" fill="var(--bg-sunk)" stroke="var(--border-strong)"/>
+          <text x="105" y="55" text-anchor="middle" font-weight="700">Data</text>
+          <text x="105" y="80" text-anchor="middle" font-family="var(--font-code)" font-size="12">1001 · 2025-09-25</text>
+          <text x="105" y="100" text-anchor="middle" font-family="var(--font-code)" font-size="12">Cola · 0.80 · 1</text>
+          <text x="105" y="120" text-anchor="middle" font-family="var(--font-code)" font-size="12">jane.morris@…</text>
+          <rect x="245" y="30" width="190" height="110" rx="10" fill="var(--c-concept-bg)" stroke="var(--c-concept)"/>
+          <text x="340" y="55" text-anchor="middle" font-weight="700" fill="var(--c-concept)">Processing</text>
+          <text x="340" y="80" text-anchor="middle">store · relate</text>
+          <text x="340" y="100" text-anchor="middle">query · aggregate</text>
+          <text x="340" y="120" text-anchor="middle">(the DBMS + SQL)</text>
+          <rect x="480" y="30" width="190" height="110" rx="10" fill="var(--c-seminar-bg)" stroke="var(--c-seminar)"/>
+          <text x="575" y="55" text-anchor="middle" font-weight="700" fill="var(--c-seminar)">Information</text>
+          <text x="575" y="80" text-anchor="middle">“Drinks are 40% of</text>
+          <text x="575" y="100" text-anchor="middle">this month’s orders;</text>
+          <text x="575" y="120" text-anchor="middle">cheddar stock is low”</text>
+          <rect x="715" y="30" width="135" height="110" rx="10" fill="var(--c-task-bg)" stroke="var(--c-task)"/>
+          <text x="782" y="55" text-anchor="middle" font-weight="700" fill="var(--c-task)">Decision</text>
+          <text x="782" y="85" text-anchor="middle">reorder</text>
+          <text x="782" y="105" text-anchor="middle">cheddar</text>
+          <path d="M202 85h38" stroke="var(--text-soft)" stroke-width="2" marker-end="url(#a1)"/><path d="M437 85h38" stroke="var(--text-soft)" stroke-width="2" marker-end="url(#a1)"/><path d="M672 85h38" stroke="var(--text-soft)" stroke-width="2" marker-end="url(#a1)"/>
+        </g>
+      </svg>
+    </div>
+    <figcaption>A database stores data; queries turn it into information; people act on information.</figcaption>
+  </figure>
+  <p>The <strong>DIKW pyramid</strong> extends this idea: <em>data</em> plus context gives <em>information</em>; information plus meaning (patterns, comparisons, experience) gives <em>knowledge</em>; knowledge plus insight gives <em>wisdom</em>, meaning sound decisions. Databases work at the bottom two levels. Reports, analytics and people supply the rest.</p>
+  <p>The simplest store of data is a <strong>flat file</strong>: a single table, such as a spreadsheet, where each row is a record and each column an attribute. It is easy to build in Excel or Access, but it cannot express relationships without repeating data. That is the problem this week solves.</p>
+  <p>A <strong>database</strong> is an organised, shared collection of related data. A <strong>database management system (DBMS)</strong> is the software that stores that data and controls access to it. It enforces structure and integrity rules, runs queries, manages concurrent users and transactions, and recovers from failures.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th></th><th>SQLite (used in this module)</th><th>Client–server DBMS (PostgreSQL, MySQL, SQL Server, Oracle)</th></tr></thead>
+    <tbody>
+      <tr><td>Architecture</td><td>Embedded library; the whole database is <strong>one file</strong></td><td>Separate server process; applications connect over a network</td></tr>
+      <tr><td>Set-up</td><td>None: built into Python (<code>import sqlite3</code>)</td><td>Install, configure and secure a server; create users</td></tr>
+      <tr><td>Concurrency</td><td>Many readers, one writer at a time</td><td>Many concurrent writers</td></tr>
+      <tr><td>User accounts / GRANT</td><td>None: access is controlled by file permissions</td><td>Full user and permission system</td></tr>
+      <tr><td>Typical use</td><td>Desktop and mobile apps, prototypes, small sites, data files</td><td>Multi-user business systems and large websites</td></tr>
+    </tbody></table></div>
+  <div class="callout task"><p class="callout-title">Think, pair, share (3 minutes)</p>
+    <p>Name a decision a manager of the Online Shop might make each week. What <em>information</em> would they need, and what raw <em>data</em> would it be built from?</p></div>
+</section>
+
+<section class="lsec">
+  <h2 id="relational-nosql">Relational and NoSQL databases</h2>
+  <p>The <strong>relational model</strong> was proposed by E. F. Codd at IBM in 1970. A <strong>relational</strong> database stores data in tables (relations) with a fixed schema. Tables are linked by key values and queried with SQL. Relational databases give strong integrity guarantees and <strong>ACID transactions</strong> (atomic, consistent, isolated, durable): ideal when many related rows must change together correctly, such as an order and its stock update.</p>
+  <p><strong>NoSQL</strong> (“not only SQL”) is a family of non-relational databases designed for flexible or changing structure, very large scale, or particular data shapes. Amazon’s Dynamo and Google’s Bigtable papers inspired many of them. The four main families:</p>
+  <figure>
+    <div class="diagram">
+      <svg viewBox="0 0 880 250" role="img" aria-labelledby="nosql-t">
+        <title id="nosql-t">The four NoSQL data models</title>
+        <g font-size="12.5">
+          <!-- document -->
+          <rect x="10" y="10" width="200" height="230" rx="10" fill="var(--bg-elev)" stroke="var(--border-strong)"/>
+          <text x="110" y="34" text-anchor="middle" font-weight="700" fill="var(--c-concept)">Document</text>
+          <rect x="25" y="48" width="170" height="140" rx="6" fill="var(--bg-code)" stroke="var(--border)"/>
+          <g font-family="var(--font-code)" font-size="11">
+            <text x="33" y="68">{ "order": 1001,</text><text x="41" y="86">"customer": {</text><text x="51" y="104">"name": "Jane" },</text>
+            <text x="41" y="122">"items": [</text><text x="51" y="140">{"sku": 1, "qty": 1},</text><text x="51" y="158">{"sku": 4, "qty": 2}</text><text x="41" y="176">] }</text>
+          </g>
+          <text x="110" y="208" text-anchor="middle" fill="var(--text-soft)">JSON / XML documents</text>
+          <text x="110" y="226" text-anchor="middle" fill="var(--text-soft)">MongoDB, CouchDB</text>
+          <!-- key value -->
+          <rect x="230" y="10" width="200" height="230" rx="10" fill="var(--bg-elev)" stroke="var(--border-strong)"/>
+          <text x="330" y="34" text-anchor="middle" font-weight="700" fill="var(--c-concept)">Key–value</text>
+          <g font-family="var(--font-code)" font-size="11">
+            <rect x="245" y="52" width="70" height="26" rx="4" fill="var(--c-task-bg)" stroke="var(--c-task)"/><text x="280" y="70" text-anchor="middle">cart:42</text>
+            <path d="M315 65h16" stroke="var(--text-soft)"/><rect x="331" y="52" width="85" height="26" rx="4" fill="var(--bg-code)" stroke="var(--border)"/><text x="373" y="70" text-anchor="middle">[1, 4, 4]</text>
+            <rect x="245" y="92" width="70" height="26" rx="4" fill="var(--c-task-bg)" stroke="var(--c-task)"/><text x="280" y="110" text-anchor="middle">sess:9f</text>
+            <path d="M315 105h16" stroke="var(--text-soft)"/><rect x="331" y="92" width="85" height="26" rx="4" fill="var(--bg-code)" stroke="var(--border)"/><text x="373" y="110" text-anchor="middle">user=7</text>
+            <rect x="245" y="132" width="70" height="26" rx="4" fill="var(--c-task-bg)" stroke="var(--c-task)"/><text x="280" y="150" text-anchor="middle">rate:GBP</text>
+            <path d="M315 145h16" stroke="var(--text-soft)"/><rect x="331" y="132" width="85" height="26" rx="4" fill="var(--bg-code)" stroke="var(--border)"/><text x="373" y="150" text-anchor="middle">1.17</text>
+          </g>
+          <text x="330" y="208" text-anchor="middle" fill="var(--text-soft)">look up by key only</text>
+          <text x="330" y="226" text-anchor="middle" fill="var(--text-soft)">Redis, DynamoDB</text>
+          <!-- wide column -->
+          <rect x="450" y="10" width="200" height="230" rx="10" fill="var(--bg-elev)" stroke="var(--border-strong)"/>
+          <text x="550" y="34" text-anchor="middle" font-weight="700" fill="var(--c-concept)">Wide-column</text>
+          <g font-size="11">
+            <rect x="462" y="50" width="176" height="22" fill="var(--c-concept-bg)" stroke="var(--border)"/><text x="470" y="65">row key</text><text x="560" y="65">profile | orders</text>
+            <rect x="462" y="72" width="176" height="44" fill="var(--bg-code)" stroke="var(--border)"/><text x="470" y="90" font-family="var(--font-code)">jane</text><text x="530" y="90">name, city</text><text x="530" y="108">o1001, o1004, o1009</text>
+            <rect x="462" y="116" width="176" height="44" fill="var(--bg-code)" stroke="var(--border)"/><text x="470" y="134" font-family="var(--font-code)">tom</text><text x="530" y="134">name</text><text x="530" y="152" fill="var(--text-faint)">(no orders column)</text>
+          </g>
+          <text x="550" y="190" text-anchor="middle" fill="var(--text-soft)">column families; rows</text>
+          <text x="550" y="208" text-anchor="middle" fill="var(--text-soft)">can have different columns</text>
+          <text x="550" y="226" text-anchor="middle" fill="var(--text-soft)">Cassandra, HBase</text>
+          <!-- graph -->
+          <rect x="670" y="10" width="200" height="230" rx="10" fill="var(--bg-elev)" stroke="var(--border-strong)"/>
+          <text x="770" y="34" text-anchor="middle" font-weight="700" fill="var(--c-concept)">Graph</text>
+          <g font-size="11">
+            <line x1="720" y1="80" x2="820" y2="80" stroke="var(--text-soft)" stroke-width="1.5"/><text x="770" y="73" text-anchor="middle" fill="var(--text-soft)">KNOWS</text>
+            <line x1="720" y1="80" x2="770" y2="160" stroke="var(--text-soft)" stroke-width="1.5"/><text x="725" y="128" fill="var(--text-soft)">BOUGHT</text>
+            <line x1="820" y1="80" x2="770" y2="160" stroke="var(--text-soft)" stroke-width="1.5"/><text x="800" y="128" fill="var(--text-soft)">BOUGHT</text>
+            <circle cx="720" cy="80" r="20" fill="var(--c-seminar-bg)" stroke="var(--c-seminar)"/><text x="720" y="84" text-anchor="middle">Jane</text>
+            <circle cx="820" cy="80" r="20" fill="var(--c-seminar-bg)" stroke="var(--c-seminar)"/><text x="820" y="84" text-anchor="middle">Roman</text>
+            <circle cx="770" cy="160" r="20" fill="var(--c-task-bg)" stroke="var(--c-task)"/><text x="770" y="164" text-anchor="middle">Cola</text>
+          </g>
+          <text x="770" y="208" text-anchor="middle" fill="var(--text-soft)">nodes + relationships</text>
+          <text x="770" y="226" text-anchor="middle" fill="var(--text-soft)">Neo4j</text>
+        </g>
+      </svg>
+    </div>
+    <figcaption>The four NoSQL families, each storing part of the Online Shop’s data in its own way.</figcaption>
+  </figure>
+  <div class="table-wrap"><table>
+    <thead><tr><th></th><th>Relational (SQL)</th><th>NoSQL</th></tr></thead>
+    <tbody>
+      <tr><td>Structure</td><td>Fixed schema of tables, rows and columns, defined before data is added</td><td>Flexible: documents, key–value pairs, column families or graphs; structure can vary per record</td></tr>
+      <tr><td>Relationships</td><td>Foreign keys and JOINs</td><td>Usually embedded or duplicated data (document), or first-class edges (graph)</td></tr>
+      <tr><td>Integrity &amp; transactions</td><td>Strong: constraints and multi-row ACID transactions</td><td>Varies; many trade strict consistency for availability and scale</td></tr>
+      <tr><td>Scaling</td><td>Traditionally scale <em>up</em> (a bigger server)</td><td>Designed to scale <em>out</em> across many servers</td></tr>
+      <tr><td>Best for</td><td>Structured, related business data such as orders, banking and enrolments</td><td>Huge volumes, rapidly changing or semi-structured data, caching, social graphs</td></tr>
+      <tr><td>Weaknesses</td><td>Rigid with unstructured data; schema changes need planning</td><td>Weaker or more complex querying across records; less mature integrity tooling</td></tr>
+    </tbody></table></div>
+  <div class="callout note"><p class="callout-title">Precise terms</p>
+    <p><strong>Cassandra and HBase are wide-column stores</strong>, not simple key–value stores. Neither is the same as a <em>column-oriented</em> relational database such as Vertica, which stores each column contiguously to speed up analytics. A <strong>BLOB</strong> (binary large object) is a data type for raw bytes such as images (Week 9). It is not another name for a document. You will meet a document format, <strong>XML</strong>, alongside SQLite in Week 7.</p></div>
+</section>
+
+<section class="lsec">
+  <h2 id="relational-model">The relational model: tables, keys and integrity</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Formal term</th><th>Everyday term</th><th>Online Shop example</th></tr></thead>
+    <tbody>
+      <tr><td>Relation</td><td>Table</td><td><code>customer</code></td></tr>
+      <tr><td>Tuple</td><td>Row / record</td><td>Jane Morris’s row</td></tr>
+      <tr><td>Attribute</td><td>Column / field</td><td><code>email</code></td></tr>
+      <tr><td>Domain</td><td>Allowed values for a column</td><td><code>status</code> ∈ {Pending, Paid, Shipped, Delivered, Cancelled}</td></tr>
+      <tr><td>Degree</td><td>Number of columns</td><td><code>customer</code> has degree 8</td></tr>
+      <tr><td>Cardinality (of a table)</td><td>Number of rows</td><td><code>customer</code> has cardinality 8 (not the same as ER cardinality, below)</td></tr>
+    </tbody></table></div>
+  <h3 id="keys">Keys</h3>
+  <dl class="terms">
+    <dt>Super key</dt><dd>Any set of columns whose values are unique for every row, e.g. <code>(customer_id, email)</code>.</dd>
+    <dt>Candidate key</dt><dd>A <em>minimal</em> super key: remove any column and it stops being unique. <code>customer_id</code> and <code>email</code> are both candidate keys of <code>customer</code>.</dd>
+    <dt>Primary key (PK)</dt><dd>The candidate key chosen to identify rows. Must be unique and never NULL. <code>customer.customer_id</code>.</dd>
+    <dt>Alternate key</dt><dd>A candidate key not chosen as the PK. Enforce it with <code>UNIQUE</code> (<code>customer.email</code>).</dd>
+    <dt>Composite key</dt><dd>A key made of two or more columns: <code>order_item (order_id, product_id)</code>.</dd>
+    <dt>Natural vs surrogate</dt><dd>A <em>natural</em> key has real-world meaning (an e-mail, a car registration). A <em>surrogate</em> key is a meaningless number generated by the database (<code>customer_id</code>). Surrogates never change and stay short, which is why most tables in the shop use them.</dd>
+    <dt>Foreign key (FK)</dt><dd>A column whose values must match a primary (or unique) key in another table: <code>orders.customer_id → customer.customer_id</code>.</dd>
+  </dl>
+  <h3 id="integrity">Integrity rules</h3>
+  <ul>
+    <li><strong>Entity integrity</strong>: every row has a primary key value that is unique and not NULL.</li>
+    <li><strong>Referential integrity</strong>: every foreign key value matches an existing key in the referenced table (or is NULL, if allowed).</li>
+    <li><strong>Domain integrity</strong>: values are of the right kind and within allowed limits (<code>NOT NULL</code>, <code>CHECK (price &gt;= 0)</code>, <code>DEFAULT</code>).</li>
+  </ul>
+  <div class="callout warn"><p class="callout-title">Two SQLite surprises</p>
+    <p><strong>1. Foreign keys are off by default.</strong> Every new connection must run <code>PRAGMA foreign_keys = ON;</code> or SQLite silently ignores every <code>REFERENCES</code> clause.</p>
+    <p><strong>2. Non-integer primary keys can be NULL</strong> unless you also write <code>NOT NULL</code> (a historical quirk). <code>INTEGER PRIMARY KEY</code> columns are safe: they are the table’s row id and are filled in automatically.</p></div>
+  <h3 id="sql-languages">The parts of SQL</h3>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Sub-language</th><th>Purpose</th><th>Statements</th><th>In SQLite</th></tr></thead>
+    <tbody>
+      <tr><td>DDL: Data Definition</td><td>Define structure</td><td><code>CREATE</code>, <code>ALTER</code>, <code>DROP</code></td><td>Yes</td></tr>
+      <tr><td>DML: Data Manipulation</td><td>Read and change rows</td><td><code>SELECT</code>, <code>INSERT</code>, <code>UPDATE</code>, <code>DELETE</code> (some books list <code>SELECT</code> separately as <strong>DQL</strong>, Data Query Language)</td><td>Yes</td></tr>
+      <tr><td>DCL: Data Control</td><td>Control who may access data</td><td><code>GRANT</code>, <code>REVOKE</code></td><td>No: use file permissions</td></tr>
+      <tr><td>TCL: Transaction Control</td><td>Group changes into transactions</td><td><code>BEGIN</code>, <code>COMMIT</code>, <code>ROLLBACK</code>, <code>SAVEPOINT</code></td><td>Yes (Week 11)</td></tr>
+    </tbody></table></div>
+  <p class="small muted">Some commands in general SQL cheat-sheets are not in SQLite: there is no <code>TRUNCATE</code> (use <code>DELETE FROM table;</code>) and no <code>MERGE</code> (use <code>INSERT … ON CONFLICT … DO UPDATE</code>, an “upsert”).</p>
+</section>
+
+<section class="lsec">
+  <h2 id="anomalies">Why normalise? Data anomalies</h2>
+  <p><strong>Redundancy</strong> means storing the same fact more than once. It wastes space, but the real damage is that the copies can drift apart. In a single “everything in one table” design, redundancy causes three kinds of <strong>anomaly</strong>. The table below is the shop’s order spreadsheet after the first clean-up step (1NF), with one row per product in an order. Try each anomaly:</p>
+  <div class="anomaly" data-src="week01_normalisation"></div>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Anomaly</th><th>What goes wrong</th><th>Root cause</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Update</strong></td><td>Changing one fact means changing many rows; miss one and the data contradicts itself.</td><td>The same fact is stored in several rows.</td></tr>
+      <tr><td><strong>Insertion</strong></td><td>You cannot record one fact without inventing another (a product without an order).</td><td>Unrelated facts share a primary key.</td></tr>
+      <tr><td><strong>Deletion</strong></td><td>Deleting one fact accidentally destroys others (the last order of a customer).</td><td>Unrelated facts live in the same row.</td></tr>
+    </tbody></table></div>
+  <div class="callout concept"><p class="callout-title">Key idea</p><p>Normalisation removes anomalies by making sure <strong>each fact is stored exactly once</strong>, in the table whose key it depends on. The tool for finding “what depends on what” is the <em>functional dependency</em>.</p></div>
+</section>
+
+<section class="lsec">
+  <h2 id="dependencies">Functional dependencies</h2>
+  <p>Attribute <code>Y</code> is <strong>functionally dependent</strong> on attribute(s) <code>X</code>, written <code>X → Y</code>, if each value of <code>X</code> is always associated with exactly one value of <code>Y</code>. <code>X</code> is called the <strong>determinant</strong>.</p>
+  <ul>
+    <li><code>email → phone</code>: knowing a customer’s e-mail tells you their (single) phone number.</li>
+    <li><code>product → price</code>: each product has one price.</li>
+    <li><code>(order_no, product) → qty</code>: you need <em>both</em> to know how many were ordered.</li>
+    <li><code>product → qty</code> does <strong>not</strong> hold: the same product is ordered in different quantities.</li>
+  </ul>
+  <div class="callout warn"><p class="callout-title">Dependencies come from business rules, not from sample data</p><p>Five rows can <em>disprove</em> a dependency (two rows with the same X but different Y) but can never prove one. In the fruit-shop data four customers share one phone number, so <code>phone → customer</code> is false. Ask the client what is <em>always</em> true.</p></div>
+  <h3 id="fd-types">Three kinds of dependency</h3>
+  <p>When the primary key is <code>(order_no, product)</code>:</p>
+  <dl class="terms">
+    <dt><span class="fd-badge full">full</span></dt><dd>A non-key attribute depends on the <strong>whole</strong> key: <code>(order_no, product) → qty</code>. This is what we want.</dd>
+    <dt><span class="fd-badge partial">partial</span></dt><dd>A non-key attribute depends on <strong>part</strong> of a composite key: <code>order_no → order_date</code>. Breaks <strong>2NF</strong>.</dd>
+    <dt><span class="fd-badge transitive">transitive</span></dt><dd>A non-key attribute depends on <strong>another non-key</strong> attribute: <code>supplier → supplier_phone</code> (key → product → supplier → supplier_phone). Breaks <strong>3NF</strong>.</dd>
+  </dl>
+  <div class="callout task"><p class="callout-title">Try it: classify each dependency (primary key = order_no + product)</p>
+    <div class="classify">
+      <div class="classify-item" data-answer="full" data-why="qty needs both the order and the product: neither alone determines it."><code>(order_no, product) → qty</code></div>
+      <div class="classify-item" data-answer="partial" data-why="order_date depends only on order_no, which is part of the composite key."><code>order_no → order_date</code></div>
+      <div class="classify-item" data-answer="partial" data-why="price depends only on product, the other part of the key."><code>product → price</code></div>
+      <div class="classify-item" data-answer="transitive" data-why="email is not a key of this table: key → order_no → email → phone."><code>email → phone</code></div>
+      <div class="classify-item" data-answer="transitive" data-why="supplier is a non-key attribute determining another non-key attribute."><code>supplier → supplier_phone</code></div>
+      <div class="classify-item" data-answer="partial" data-why="Which customer placed the order depends on order_no alone."><code>order_no → email</code></div>
+      <div class="classify-item" data-answer="transitive" data-why="VAT rate belongs to the category, and category is not a key."><code>category → vat_rate</code></div>
+      <div class="classify-item" data-answer="transitive" data-why="A UK postcode determines its county, and postcode is not a key."><code>postcode → county</code></div>
+      <p class="small muted" style="margin:.6rem 0 0"><span class="classify-score"></span> <button class="btn" type="button" data-reset style="margin-left:.5rem">Reset</button></p>
+    </div></div>
+</section>
+
+<section class="lsec">
+  <h2 id="normal-forms">Normalising step by step: UNF → 3NF</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Form</th><th>Rule</th><th>How to get there</th></tr></thead>
+    <tbody>
+      <tr><td><strong>UNF</strong></td><td>Unnormalised: cells may hold several values, groups of values repeat, no key.</td><td>—</td></tr>
+      <tr><td><strong>1NF</strong></td><td>Every cell holds a single (atomic) value; no repeating groups; each row identified by a primary key.</td><td>Split multi-part values into columns; give each repeated item its own row; choose a key.</td></tr>
+      <tr><td><strong>2NF</strong></td><td>1NF, and no <span class="fd-badge partial">partial</span> dependency: every non-key attribute depends on the <em>whole</em> key.</td><td>Move attributes that depend on part of the key into a new table with that part as its key.</td></tr>
+      <tr><td><strong>3NF</strong></td><td>2NF, and no <span class="fd-badge transitive">transitive</span> dependency: no non-key attribute depends on another non-key attribute.</td><td>Move the dependent attributes into a new table keyed by their determinant; leave a foreign key behind.</td></tr>
+    </tbody></table></div>
+  <div class="callout concept"><p class="callout-title">Memory aid</p><p>In 3NF every non-key attribute depends on <strong>the key</strong> (1NF), <strong>the whole key</strong> (2NF), <strong>and nothing but the key</strong> (3NF).</p></div>
+  <p>Step through the Online Shop’s order spreadsheet. It is based on last year’s Week 1 workbook, with the data tidied up. Yellow cells are redundant copies of facts already stored in an earlier row; red cells hold more than one value.</p>
+
+  <div class="stepper" data-src="week01_normalisation">
+<template data-step="unf" data-label="Flat file (UNF)">
+<h4>Unnormalised form: the client’s spreadsheet</h4>
+<p>This is the kind of sheet a client hands you. Each row is an order, but the <strong>customer</strong> cell mixes name and address, the <strong>contact</strong> cell holds two facts, and the <strong>items</strong> cell contains a <em>repeating group</em>: a list of products, each with its own price, category, VAT rate, supplier and quantity. Nothing can be searched, totalled or checked reliably.</p>
+<!--TABLES-->
+<p><strong>Problems to fix:</strong> non-atomic cells (red) and a repeating group (items). There is also no reliable key: <code>order_no</code> identifies an order, but not an individual item.</p>
+</template>
+<template data-step="1nf" data-label="1NF">
+<h4>First normal form: atomic values, no repeating groups</h4>
+<ol>
+<li><strong>Split composite cells</strong> into single-value columns: <code>first_name</code>, <code>last_name</code>, <code>address_line</code>, <code>postcode</code>, <code>email</code>, <code>phone</code>…</li>
+<li><strong>Remove the repeating group</strong> by giving every item its own row and copying the order details onto it.</li>
+<li><strong>Choose a primary key.</strong> <code>order_no</code> alone is <em>not</em> unique (order 1001 now has two rows), and <code>product</code> alone is not unique either (Cola appears in orders 1001 and 1004). The <strong>pair</strong> <code>(order_no, product)</code> is unique for every row, so together they form a <strong>composite primary key</strong>. Neither column is the key on its own. The orange band above the two left-hand columns marks them as one key.</li>
+</ol>
+<p class="small muted">Assumption from the business rules: a product appears at most once per order (buying two colas is one line with quantity 2). If the same product could appear on two lines of one order, you would need a line number in the key instead.</p>
+<!--TABLES-->
+<p><strong>Dependencies</strong> (from the shop’s business rules). Each is checked against the sample data: no value on the left is ever paired with two different values on the right.</p>
+<!--FDS-->
+<p class="small">How to read the labels: a <strong>partial</strong> dependency depends on <em>one part</em> of the composite key. A <strong>transitive</strong> dependency depends on a non-key column, which itself depends on the key. For example, <code>first_name</code> depends on <code>email</code>, which depends on <code>order_no</code>. Relative to the full key that makes <code>first_name</code> both transitively dependent <em>and</em> partially dependent (through <code>order_no</code>), which is why it moves out first with <code>order_no</code> in 2NF and then into <code>customer</code> in 3NF.</p>
+<p><strong>Still wrong:</strong> the yellow cells are redundant copies. Jane’s details appear on four rows and Fizz &amp; Co’s phone number on three, so this table still suffers every anomaly in the anomaly lab above. 1NF is necessary but not enough.</p>
+</template>
+<template data-step="2nf" data-label="2NF">
+<h4>Second normal form: remove partial dependencies</h4>
+<p>Every attribute that depends on only <em>part</em> of the composite key moves out, together with that part of the key:</p>
+<ul>
+<li>Everything determined by <code>order_no</code> alone → <code>orders_2nf</code> (key <code>order_no</code>).</li>
+<li>Everything determined by <code>product</code> alone → <code>product_2nf</code> (key <code>product</code>).</li>
+<li>Only <code>qty</code> depends on the whole key, so it stays in <code>order_line_2nf</code>, whose two key columns are now also <strong>foreign keys</strong>.</li>
+</ul>
+<!--TABLES-->
+<p>Notice that <code>order_line_2nf</code> still records <em>which products are in which order</em>. Every decomposition must keep the ability to join the data back together (it must be <strong>lossless</strong>).</p>
+<p><strong>Still wrong:</strong> transitive dependencies remain. Jane’s details are repeated for orders 1001 and 1004, Fizz &amp; Co’s phone and the Drinks VAT rate are repeated across products, and county depends on postcode:</p>
+<!--FDS-->
+</template>
+<template data-step="3nf" data-label="3NF">
+<h4>Third normal form: remove transitive dependencies</h4>
+<p>Each determinant of a transitive dependency becomes the key of its own table, and a foreign key is left behind:</p>
+<ul>
+<li><code>email → name, phone, address…</code> becomes <code>customer</code>. A surrogate key <code>customer_id</code> is added, because e-mail addresses change and would otherwise have to be updated in every order.</li>
+<li><code>postcode → county, country</code> becomes <code>postcode_area</code>.</li>
+<li><code>category → vat_rate</code> becomes <code>category</code>, and <code>supplier → supplier_phone</code> becomes <code>supplier</code>.</li>
+<li><code>product</code> now references <code>category</code> and <code>supplier</code> by their ids, and <code>order_line</code> references <code>product_id</code>.</li>
+</ul>
+<!--TABLES-->
+<p><strong>Check:</strong> in every table each non-key column depends on the key, the whole key and nothing but the key, so every fact is now stored once. Jane’s phone number lives in exactly one cell. A product can be added before anyone orders it. Deleting order 1003 no longer deletes Andy, Olive Oil or Home Foods.</p>
+</template>
+<template data-step="design" data-label="Final design">
+<h4>From the 3NF tables to the Online Shop schema</h4>
+<p>Normalisation gives a correct starting point. A designer then makes documented decisions based on the client’s requirements. Each decision keeps the schema in 3NF:</p>
+<div class="table-wrap"><table><thead><tr><th>Decision</th><th>Reason</th></tr></thead><tbody>
+<tr><td>Surrogate integer keys everywhere (<code>order_id</code>, <code>product_id</code>, …)</td><td>Short, stable and never change, unlike product names or e-mails.</td></tr>
+<tr><td>Drop <code>postcode_area</code>; store only <code>postcode</code></td><td>The client delivers only in the UK and never uses county or country, so the cleanest fix is not to store derivable data. Keeping a lookup table would also be valid 3NF.</td></tr>
+<tr><td>Add <code>unit_price</code> to the order line → <code>order_item</code></td><td>Cola cost £0.80 in 2025 and £0.85 now. The price <em>charged</em> is a different fact from today’s list price, so storing it is <strong>not</strong> redundancy.</td></tr>
+<tr><td>Add <code>inventory</code> (1:1 with product)</td><td>Requirement: track stock and reorder levels. Kept separate because it changes on every sale (and will be maintained by triggers in Week 2).</td></tr>
+<tr><td>Add <code>user_account</code> (optional 1:1 with customer)</td><td>Requirement: customers can log in online. Phone customers do not need an account.</td></tr>
+<tr><td>Rename <code>order</code> tables to <code>orders</code> / <code>order_item</code></td><td><code>ORDER</code> is a reserved word in SQL.</td></tr>
+</tbody></table></div>
+<p>The result is the eight-table schema drawn in the next sections and built in <a href="#sqlite-build">Building the database in SQLite</a>.</p>
+</template>
+  </div>
+  <div class="callout rec"><p class="callout-title">Teaching recommendation for your report</p><p>Show each stage as a table (screenshots of your Excel sheets are fine), list the functional dependencies you found, label each as partial or transitive, and say which table each one moved into. That is exactly the “steps from 1NF to 3NF with clear explanation” the brief asks for. The <a href="#resources-downloads">walkthrough workbook</a> shows a layout you can follow.</p></div>
+</section>
+
+<section class="lsec">
+  <h2 id="beyond-3nf">Beyond 3NF, and when to denormalise</h2>
+  <p>There are more normal forms than three. Each removes a rarer kind of redundancy:</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Form</th><th>Removes</th><th>Example</th></tr></thead>
+    <tbody>
+      <tr><td><strong>BCNF</strong> (Boyce–Codd)</td><td>Any dependency whose determinant is not a candidate key</td><td><code>(student, module) → tutor</code> where each tutor teaches only one module (<code>tutor → module</code>). This is 3NF but not BCNF.</td></tr>
+      <tr><td><strong>4NF</strong></td><td>Independent multi-valued facts stored together</td><td>A table of (employee, skill, language): skills and languages are unrelated lists.</td></tr>
+      <tr><td><strong>5NF</strong></td><td>Join dependencies (data that can only be rebuilt from three or more projections)</td><td>Rare in practice.</td></tr>
+      <tr><td>6NF, DKNF</td><td>Theoretical forms used in specialist (e.g. temporal) databases</td><td>—</td></tr>
+    </tbody></table></div>
+  <p>For most business systems <strong>3NF (or BCNF) is the practical target</strong>, and 3NF is what the assessment asks for.</p>
+  <p><strong>Denormalisation</strong> deliberately re-introduces redundancy to speed up reads, for example storing an <code>order_total</code> so reports do not have to add up items. It must be a conscious, documented decision, because you take back the anomaly risk. A <strong>view</strong> (Week 3) usually gives the convenience without the redundancy.</p>
+</section>
+
+<section class="lsec">
+  <h2 id="er-concepts">ER modelling concepts</h2>
+  <p>An <strong>entity–relationship (ER) model</strong> describes the things a business needs to keep data about and how they relate. It is drawn as an ER diagram (ERD) before any SQL is written.</p>
+  <dl class="terms">
+    <dt>Entity</dt><dd>A thing of interest with its own identity: CUSTOMER, PRODUCT, ORDERS. (An <em>entity type</em> is the category; an <em>instance</em> is one occurrence, such as Jane.)</dd>
+    <dt>Attribute</dt><dd>A property of an entity. It can be <strong>simple</strong> or <strong>composite</strong> (an address made of street and postcode), <strong>single-</strong> or <strong>multi-valued</strong> (several phone numbers), and <strong>stored</strong> or <strong>derived</strong> (order total = Σ quantity × unit price).</dd>
+    <dt>Key attribute</dt><dd>An attribute that uniquely identifies each instance.</dd>
+    <dt>Relationship</dt><dd>An association between entities: a customer <em>places</em> orders. Its <strong>degree</strong> is the number of entity types involved: unary (an employee <em>manages</em> employees), binary (most relationships) or ternary.</dd>
+    <dt>Weak entity</dt><dd>An entity that cannot be identified without its owner, e.g. INVENTORY exists only for a PRODUCT.</dd>
+  </dl>
+  <h3 id="unary">A unary (recursive) relationship</h3>
+  <p>In a unary relationship an entity is related to <em>itself</em>, playing two <strong>roles</strong>. The classic example comes from the original Week 1 database: the <code>EMP</code> table, where each employee’s <code>mgr</code> column holds the <code>empno</code> of their manager. Each employee (as a manager) manages zero or many employees; each employee (as a subordinate) is managed by zero or one employee, since the president has none.</p>
+  <div class="erd-widget" data-model="unary"></div>
+  <p>In tables it is simply a foreign key that references the <strong>same table</strong>, and you query it by joining the table to itself with two aliases:</p>
+  <div class="playground" data-db="empty" data-setup-src="downloads/week01/unary_emp.sql" data-title="Self-join: who manages whom?">
+<script type="text/plain" class="pg-sql">
+-- e = the employee, m = their manager (the same table, used twice)
+SELECT e.ename AS employee, e.job, m.ename AS manager
+FROM emp AS e
+LEFT JOIN emp AS m ON m.empno = e.mgr      -- LEFT JOIN keeps KING, who has no manager
+ORDER BY m.ename, e.ename;
+</script>
+  </div>
+  <h3 id="cardinality">Cardinality and participation</h3>
+  <p>Each <em>end</em> of a relationship has two numbers:</p>
+  <ul>
+    <li><strong>Maximum (cardinality)</strong>: <em>one</em> or <em>many</em>. This gives the relationship type: 1:1, 1:N or M:N.</li>
+    <li><strong>Minimum (participation / optionality)</strong>: <em>zero</em> (optional, <em>partial</em> participation) or <em>one</em> (mandatory, <em>total</em> participation).</li>
+  </ul>
+  <p>Read a relationship <strong>in both directions</strong>, starting each sentence with “Each”:</p>
+  <div class="callout concept"><p class="callout-title">Reading CUSTOMER — places — ORDERS</p>
+    <p>Each customer places <strong>zero or many</strong> orders (a new customer may not have ordered yet).<br>Each order is placed by <strong>exactly one</strong> customer (an order cannot exist without its customer).</p></div>
+  <p>Cardinalities come from <strong>business rules</strong>. Write the rule first, then draw the symbols:</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Business rule (Online Shop)</th><th>Min</th><th>Max</th></tr></thead>
+    <tbody>
+      <tr><td>A customer may have an online account, but does not have to.</td><td>0</td><td>1</td></tr>
+      <tr><td>An account always belongs to one customer.</td><td>1</td><td>1</td></tr>
+      <tr><td>An order must contain at least one product.</td><td>1</td><td>many</td></tr>
+      <tr><td>A product may never have been ordered.</td><td>0</td><td>many</td></tr>
+      <tr><td>Every product has exactly one stock record.</td><td>1</td><td>1</td></tr>
+      <tr><td><em>Outside the shop:</em> a vehicle has one registered keeper; a person may keep one or more vehicles (person end of “owns”).</td><td>1</td><td>1</td></tr>
+    </tbody></table></div>
+</section>
+
+<section class="lsec">
+  <h2 id="notations">Crow’s Foot and Chen notation</h2>
+  <p>Both notations describe the same model. <strong>Chen</strong> (Peter Chen, 1976) is <em>conceptual</em>: it shows entities, attributes and relationships without implementation detail. <strong>Crow’s Foot</strong> (also called Information Engineering notation) is usually <em>logical</em>: boxes look like tables and list keys and foreign keys. It is the default in tools such as MySQL Workbench, Lucidchart and draw.io. <strong>This module uses Crow’s Foot by default</strong>; you should be able to read both.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Element</th><th>Crow’s Foot</th><th>Chen</th></tr></thead>
+    <tbody>
+      <tr><td>Entity</td><td>Box with the name in a header</td><td>Rectangle</td></tr>
+      <tr><td>Attributes</td><td>Listed inside the box, often with data types</td><td>Ovals connected to the entity</td></tr>
+      <tr><td>Primary key</td><td>Marked <b>PK</b> (and often underlined)</td><td>Attribute name underlined</td></tr>
+      <tr><td>Foreign key</td><td>Shown and marked <b>FK</b></td><td><strong>Not shown</strong>: the relationship implies it</td></tr>
+      <tr><td>Relationship</td><td>A line, often labelled with a verb</td><td>Diamond containing a verb</td></tr>
+      <tr><td>Maximum (one / many)</td><td>A bar <b>|</b> for one, a crow’s foot for many, drawn at the line end</td><td><b>1</b>, <b>N</b> or <b>M</b> written beside each entity</td></tr>
+      <tr><td>Minimum (optional / mandatory)</td><td>A circle <b>○</b> for zero, a bar <b>|</b> for one, drawn just outside the maximum symbol</td><td>Single line = partial participation; <strong>double line = total participation</strong></td></tr>
+      <tr><td>Many-to-many</td><td>Usually resolved into a junction (associative) entity</td><td>Drawn directly; the diamond can own attributes</td></tr>
+      <tr><td>Weak entity / identifying relationship</td><td>A table whose PK includes the owner’s key. Here the line is <strong>solid</strong> for an identifying relationship and <strong>dashed</strong> for a non-identifying one (the Coronel &amp; Morris and MySQL Workbench convention)</td><td>Double rectangle, joined to its owner by a double-diamond identifying relationship</td></tr>
+    </tbody></table></div>
+  <div class="callout note"><p class="callout-title">Look-across reading</p><p>In both notations the symbol <em>next to</em> an entity says how many of <strong>that</strong> entity relate to one instance of the entity at the <strong>other</strong> end. The crow’s foot beside ORDERS means “many orders per customer”. Some textbooks use a (min,max) variant of Chen that is read the opposite way, and some slides and tools mix the two styles (a Chen diamond on a line with crow’s-foot ends). Always check the key on a diagram, and use one notation consistently in your own work.</p></div>
+
+  <h3 id="one-to-one">One-to-one (1:1)</h3>
+  <p>Each customer has <strong>zero or one</strong> account; each account belongs to <strong>exactly one</strong> customer. Toggle the notation to compare: the optional side becomes a circle in Crow’s Foot and a single line in Chen. The Crow’s Foot line is dashed because the relationship is <em>non-identifying</em>: <code>account_id</code>, not <code>customer_id</code>, identifies an account.</p>
+  <div class="erd-widget" data-model="one_to_one"></div>
+  <h3 id="one-to-many">One-to-many (1:N)</h3>
+  <p>The most common relationship. Each customer places <strong>zero or many</strong> orders; each order is placed by <strong>exactly one</strong> customer. In Chen, ORDERS has a double line (total participation) because every order must have a customer.</p>
+  <div class="erd-widget" data-model="one_to_many"></div>
+  <h3 id="many-to-many">Many-to-many (M:N)</h3>
+  <p>An order contains <strong>one or many</strong> products; a product appears in <strong>zero or many</strong> orders. Chen draws this directly, and the relationship <em>owns</em> attributes (quantity, unit price) that belong to neither entity alone.</p>
+  <div class="erd-widget" data-model="many_to_many"></div>
+</section>
+
+<section class="lsec">
+  <h2 id="shop-erd">The Online Shop ER diagram</h2>
+  <p>This is the complete Week 1 design: the 3NF tables from the normalisation steps plus the requirement-driven <code>inventory</code> and <code>user_account</code>. <strong>Click any entity or relationship</strong> for a plain-English reading and the SQLite constraint that implements it. Switch notation to see what each one emphasises.</p>
+  <div class="erd-widget" data-model="shop" data-caption="Online Shop v1. Crow’s Foot shows the eight tables. Chen shows seven entities: ORDER_ITEM becomes the M:N relationship CONTAINS, and INVENTORY is a weak entity owned by PRODUCT."></div>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Relationship</th><th>Type</th><th>Reading</th></tr></thead>
+    <tbody>
+      <tr><td>CUSTOMER – USER_ACCOUNT</td><td>1:1, optional for customer</td><td>Each customer has zero or one account; each account belongs to exactly one customer.</td></tr>
+      <tr><td>CUSTOMER – ORDERS</td><td>1:N</td><td>Each customer places zero or many orders; each order is placed by exactly one customer.</td></tr>
+      <tr><td>ORDERS – PRODUCT (via ORDER_ITEM)</td><td>M:N</td><td>Each order contains one or many products; each product appears in zero or many orders.</td></tr>
+      <tr><td>CATEGORY – PRODUCT</td><td>1:N</td><td>Each category classifies zero or many products; each product belongs to exactly one category.</td></tr>
+      <tr><td>SUPPLIER – PRODUCT</td><td>1:N</td><td>Each supplier supplies zero or many products; each product is supplied by exactly one supplier.</td></tr>
+      <tr><td>PRODUCT – INVENTORY</td><td>1:1, mandatory both ways</td><td>Each product has exactly one stock record; each stock record is for exactly one product.</td></tr>
+    </tbody></table></div>
+  <h3 id="weak-entity">Why INVENTORY is a weak entity in the Chen diagram</h3>
+  <p>A <strong>weak entity</strong> has no key of its own: it is identified through its <em>owner</em>. An inventory record means nothing without the product it counts, and the database identifies it by the product’s key (<code>inventory.product_id</code> is the whole primary key). In Chen notation this is shown three ways:</p>
+  <ul>
+    <li>INVENTORY is a <strong>double rectangle</strong> (weak entity);</li>
+    <li>HAS_STOCK is a <strong>double diamond</strong> (the <em>identifying relationship</em> that supplies the key);</li>
+    <li>INVENTORY has a <strong>double line</strong> to HAS_STOCK, because a weak entity <em>always</em> has total participation in its identifying relationship.</li>
+  </ul>
+  <p>The cardinality is 1:1, so INVENTORY needs no <em>partial key</em> (the dashed-underlined discriminator that a weak entity has when one owner can have several, such as a room number within a building). PRODUCT’s double line is a business rule: every product must have a stock record.</p>
+  <div class="callout note"><p class="callout-title">A legitimate alternative</p><p>Conceptually you could also treat <code>qty_in_stock</code>, <code>reorder_level</code> and <code>last_restocked</code> as ordinary attributes of PRODUCT, and only split them into a separate table at the logical level for practical reasons. Both models are defensible. What matters in your report is that the diagram, the reasoning and the SQL agree.</p></div>
+
+  <h3 id="chen-to-crow">From conceptual (Chen) to logical (Crow’s Foot)</h3>
+  <p>The two diagrams above are the <strong>same design at two levels</strong>. Chen records <em>what</em> the business needs; Crow’s Foot records <em>how</em> it is stored in tables. Moving from one to the other is a set of mechanical rules:</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>In the Chen (conceptual) model</th><th>Becomes in the Crow’s Foot (logical) model</th></tr></thead>
+    <tbody>
+      <tr><td>Entity CUSTOMER with key attribute <u>customer_id</u></td><td>Table <code>customer</code>, <code>customer_id</code> PK</td></tr>
+      <tr><td>1:N relationship PLACES (ORDERS total)</td><td>FK <code>orders.customer_id</code> on the N side, <strong>NOT NULL</strong> because ORDERS participates totally; drawn as a dashed (non-identifying) line</td></tr>
+      <tr><td>1:1 relationship HAS (USER_ACCOUNT total, CUSTOMER partial)</td><td>FK <code>user_account.customer_id</code> on the side that participates totally, made <strong>UNIQUE</strong> to keep it 1:1</td></tr>
+      <tr><td><strong>M:N relationship CONTAINS</strong> with attributes <em>quantity</em>, <em>unit_price</em></td><td><strong>New associative table <code>order_item</code></strong>: PK = (<code>order_id</code>, <code>product_id</code>), both also FKs; <code>quantity</code> and <code>unit_price</code> become its columns. One M:N line becomes <strong>two 1:N lines</strong>, both identifying (solid).</td></tr>
+      <tr><td>Weak entity INVENTORY + identifying relationship HAS_STOCK</td><td>Table <code>inventory</code> whose PK <em>is</em> the owner’s key <code>product_id</code> (also an FK); solid, identifying line</td></tr>
+      <tr><td>No foreign keys anywhere</td><td>Every relationship now shows its FK column(s)</td></tr>
+    </tbody></table></div>
+  <p>Look at how the <strong>cardinalities move</strong> when CONTAINS becomes ORDER_ITEM. In Chen, “each order contains <em>one or many</em> products” and “each product appears in <em>zero or many</em> orders”. In Crow’s Foot each of these readings moves onto one of the new lines, at the ORDER_ITEM end:</p>
+  <ul>
+    <li><strong>ORDERS – ORDER_ITEM</strong> (bars at ORDERS, bar + crow’s foot at ORDER_ITEM): each order has <strong>one or many</strong> order items (the “1” minimum stays with the order);</li>
+    <li><strong>PRODUCT – ORDER_ITEM</strong> (bars at PRODUCT, circle + crow’s foot at ORDER_ITEM): each product appears as <strong>zero or many</strong> order items;</li>
+    <li>each order item belongs to <strong>exactly one</strong> order and refers to <strong>exactly one</strong> product, because its two FKs are NOT NULL parts of its key.</li>
+  </ul>
+  <p>Switch the large diagram between notations while reading this table. Every row above is visible on screen.</p>
+
+  <div class="callout warn"><p class="callout-title">What a diagram promises versus what SQLite enforces</p><p>Some minimums in the diagram are <em>business rules</em> that foreign keys alone cannot enforce: “an order has at least one item” and “every product has a stock record”. Note them in your design. Week 2 shows how triggers enforce rules like these.</p></div>
+</section>
+
+<section class="lsec">
+  <h2 id="mapping">Mapping an ER diagram to tables</h2>
+  <ol class="steps">
+    <li><strong>Each strong entity becomes a table.</strong> Simple attributes become columns; the key becomes the <code>PRIMARY KEY</code>.</li>
+    <li><strong>Composite attributes</strong> are split into their parts (<code>address_line</code>, <code>postcode</code>).</li>
+    <li><strong>Multi-valued attributes</strong> move to their own table, e.g. <code>customer_phone(customer_id, phone)</code> if a customer could have several numbers.</li>
+    <li><strong>1:N</strong>: put a foreign key in the table on the <em>many</em> side (<code>orders.customer_id</code>). Make it <code>NOT NULL</code> when participation on that side is total.</li>
+    <li><strong>1:1</strong>: put the foreign key on the optional or dependent side and add <code>UNIQUE</code> (<code>user_account.customer_id</code>). Without <code>UNIQUE</code> it would be 1:N.</li>
+    <li><strong>M:N</strong>: create a <strong>junction table</strong> holding both foreign keys, usually as a composite primary key. The relationship’s attributes become its columns.</li>
+    <li><strong>Weak entity</strong>: its primary key includes the owner’s key (<code>inventory.product_id</code> is both PK and FK).</li>
+    <li><strong>Derived attributes</strong> are normally <em>not</em> stored. Calculate them in queries or views (Week 3).</li>
+  </ol>
+  <p>Here is rule 6 applied: the many-to-many from the previous section, resolved with <code>order_item</code>.</p>
+  <div class="erd-widget" data-model="mn_resolved"></div>
+  <pre><code class="language-sql" data-file="schema_v1.sql (extract)">
+CREATE TABLE order_item (
+    order_id    INTEGER NOT NULL
+                REFERENCES orders (order_id)
+                ON UPDATE CASCADE ON DELETE CASCADE,
+    product_id  INTEGER NOT NULL
+                REFERENCES product (product_id)
+                ON UPDATE CASCADE ON DELETE RESTRICT,
+    quantity    INTEGER NOT NULL CHECK (quantity > 0),
+    unit_price  REAL    NOT NULL CHECK (unit_price >= 0),
+    PRIMARY KEY (order_id, product_id)          -- one row per product per order
+);
+</code></pre>
+</section>
+
+<section class="lsec">
+  <h2 id="sqlite-build">Building the database in SQLite</h2>
+  <p>The full script is <code>schema_v1.sql</code> (see Resources). Each table follows the mapping rules. Here are three of them:</p>
+  <pre><code class="language-sql" data-file="schema_v1.sql (extract)">
+CREATE TABLE customer (
+    customer_id   INTEGER PRIMARY KEY,                    -- surrogate key, auto-assigned
+    first_name    TEXT    NOT NULL,
+    last_name     TEXT    NOT NULL,
+    email         TEXT    NOT NULL UNIQUE,                -- alternate (candidate) key
+    phone         TEXT,
+    address_line  TEXT    NOT NULL,
+    postcode      TEXT    NOT NULL,
+    registered_on TEXT    NOT NULL DEFAULT (date('now'))  -- ISO date 'YYYY-MM-DD'
+);
+
+CREATE TABLE user_account (
+    account_id    INTEGER PRIMARY KEY,
+    customer_id   INTEGER NOT NULL UNIQUE                 -- UNIQUE makes it 1:1
+                  REFERENCES customer (customer_id)
+                  ON UPDATE CASCADE ON DELETE CASCADE,
+    username      TEXT    NOT NULL UNIQUE,
+    password_hash TEXT    NOT NULL,                       -- never plain text (Week 6)
+    created_at    TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE orders (                                     -- ORDER is a reserved word
+    order_id      INTEGER PRIMARY KEY,
+    customer_id   INTEGER NOT NULL
+                  REFERENCES customer (customer_id)
+                  ON UPDATE CASCADE ON DELETE RESTRICT,
+    order_date    TEXT    NOT NULL DEFAULT (date('now')),
+    status        TEXT    NOT NULL DEFAULT 'Pending'
+                  CHECK (status IN ('Pending','Paid','Shipped','Delivered','Cancelled'))
+);
+</code></pre>
+  <h3 id="ri-actions">Choosing referential actions</h3>
+  <p>The brief asks you to explain <em>which</em> referential integrity constraints you used and <em>why</em>. The <code>ON DELETE</code> / <code>ON UPDATE</code> action says what happens to child rows when the parent row changes:</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Action</th><th>Effect when the parent is deleted</th><th>Used in the shop for</th><th>Why</th></tr></thead>
+    <tbody>
+      <tr><td><code>RESTRICT</code></td><td>The delete is refused while children exist</td><td><code>orders → customer</code>, <code>product → category / supplier</code>, <code>order_item → product</code></td><td>Order history is a financial record; it must never vanish because a customer or product was removed.</td></tr>
+      <tr><td><code>CASCADE</code></td><td>The children are deleted too</td><td><code>order_item → orders</code>, <code>inventory → product</code>, <code>user_account → customer</code></td><td>The child has no meaning without its parent (an order line without its order).</td></tr>
+      <tr><td><code>SET NULL</code></td><td>The child’s FK becomes NULL</td><td>(not used)</td><td>Suits optional links, e.g. a product’s “featured supplier”.</td></tr>
+      <tr><td><code>NO ACTION</code> (default)</td><td>Like RESTRICT, but checked at the end of the statement</td><td>—</td><td>—</td></tr>
+    </tbody></table></div>
+  <p><code>ON UPDATE CASCADE</code> is used throughout, so if a key value ever changes, the foreign keys follow it.</p>
+
+  <h3 id="explore-sql">Explore the database</h3>
+  <p>Every playground below runs real SQLite in your browser on its own copy of <code>shop_v1.db</code>. Press <strong>Schema</strong> to list all the tables and columns.</p>
+  <div class="playground" data-db="shop_v1" data-title="Live coding 1: rebuild the flat file with JOINs">
+<script type="text/plain" class="pg-sql">
+-- Normalisation split the data up. JOINs put it back together
+-- without losing anything: a "lossless" decomposition.
+SELECT o.order_id,
+       c.first_name || ' ' || c.last_name AS customer,
+       p.name       AS product,
+       cat.name     AS category,
+       s.name       AS supplier,
+       oi.quantity,
+       oi.unit_price
+FROM orders     AS o
+JOIN customer   AS c   ON c.customer_id   = o.customer_id
+JOIN order_item AS oi  ON oi.order_id     = o.order_id
+JOIN product    AS p   ON p.product_id    = oi.product_id
+JOIN category   AS cat ON cat.category_id = p.category_id
+JOIN supplier   AS s   ON s.supplier_id   = p.supplier_id
+WHERE o.order_id BETWEEN 1001 AND 1004
+ORDER BY o.order_id, p.name;
+</script>
+  </div>
+  <div class="callout task"><p class="callout-title">Live coding 2: constraints in action</p>
+    <p>Each statement below breaks a different rule. <strong>Select one statement</strong> with the mouse and press Run (only the selection runs). Read each error, then fix the statement so it succeeds.</p></div>
+  <div class="playground" data-db="shop_v1" data-title="Constraints in action" data-expect-error="true">
+<script type="text/plain" class="pg-sql">
+-- 1. FOREIGN KEY: customer 999 does not exist
+INSERT INTO orders (order_id, customer_id) VALUES (2001, 999);
+
+-- 2. UNIQUE: this e-mail already belongs to Jane
+INSERT INTO customer (first_name, last_name, email, address_line, postcode)
+VALUES ('Janet', 'Morrison', 'jane.morris@example.com', '1 Any Street', 'SO14 0AA');
+
+-- 3. UNIQUE on user_account.customer_id: Jane already has an account (1:1)
+INSERT INTO user_account (customer_id, username, password_hash)
+VALUES (1, 'jane2', 'not-a-real-hash');
+
+-- 4. CHECK: quantity must be greater than zero
+INSERT INTO order_item (order_id, product_id, quantity, unit_price)
+VALUES (1009, 1, 0, 0.85);
+
+-- 5. RESTRICT: Drinks still has products, so it cannot be deleted
+DELETE FROM category WHERE category_id = 1;
+
+-- 6. This one is valid: Tom (customer 8) places his first order
+INSERT INTO orders (order_id, customer_id, order_date, status)
+VALUES (2001, 8, '2026-02-10', 'Pending');
+</script>
+  </div>
+  <div class="playground" data-db="shop_v1" data-title="Live coding 3: optional participation">
+<script type="text/plain" class="pg-sql">
+-- Customers who have never placed an order (participation is optional)
+SELECT c.customer_id, c.first_name, c.last_name
+FROM customer AS c
+LEFT JOIN orders AS o ON o.customer_id = c.customer_id
+WHERE o.order_id IS NULL;
+
+-- Customers without an online account (the optional side of the 1:1)
+SELECT c.customer_id, c.first_name, c.last_name
+FROM customer AS c
+WHERE NOT EXISTS (SELECT 1 FROM user_account AS u WHERE u.customer_id = c.customer_id);
+</script>
+  </div>
+  <div class="callout note"><p class="callout-title">Data types in SQLite</p><p>SQLite uses <em>type affinity</em>: a column’s declared type is a strong hint, not a strict rule. Use <code>INTEGER</code>, <code>REAL</code>, <code>TEXT</code> and <code>BLOB</code>, and store dates as ISO-8601 text (<code>'2026-02-10'</code>) so they sort and compare correctly. Prices are <code>REAL</code> here for simplicity; production systems often store whole pence as <code>INTEGER</code> to avoid rounding errors.</p></div>
+</section>
+
+<section class="lsec">
+  <h2 id="python">Connecting from Python</h2>
+  <p>The same database is used from Python with the built-in <code>sqlite3</code> module. That is the foundation of the Tkinter application from Week 4. The full script is <code>explore_shop_v1.py</code>; here are the key parts, step by step.</p>
+  <h3 id="py-connect">1. Connect, and switch foreign keys on</h3>
+  <pre><code class="language-python" data-file="explore_shop_v1.py">
+import sqlite3
+from pathlib import Path
+
+# Find the database next to THIS script, wherever the folder is.
+DB_PATH = Path(__file__).resolve().parent / "shop_v1.db"
+
+def connect(path=DB_PATH):
+    con = sqlite3.connect(path)
+    con.row_factory = sqlite3.Row               # access columns by name: row["email"]
+    con.execute("PRAGMA foreign_keys = ON")     # OFF by default, on EVERY connection
+    return con
+</code></pre>
+  <p><code>Path(__file__).resolve().parent</code> replaces hard-coded paths such as <code>C:\Users\Admin\Downloads\db1.db</code>, which break on every other computer, including the marker’s.</p>
+  <h3 id="py-params">2. Parameterised queries</h3>
+  <pre><code class="language-python" data-file="explore_shop_v1.py">
+email = "jane.morris@example.com"   # imagine this came from a Tkinter Entry box
+rows = con.execute(
+    """SELECT o.order_id, o.order_date, o.status
+       FROM orders o JOIN customer c ON c.customer_id = o.customer_id
+       WHERE c.email = ?
+       ORDER BY o.order_date""",
+    (email,),                         # a tuple: note the trailing comma
+).fetchall()
+for r in rows:
+    print(r["order_id"], r["order_date"], r["status"])
+</code></pre>
+  <div class="callout warn"><p class="callout-title">Never build SQL by joining strings</p><p>Code such as <code>"... WHERE email='" + email + "'"</code> lets a user type SQL into your program: an <em>SQL injection</em>. Always use <code>?</code> placeholders, from the very first line of your project. Week 10 shows the attack in detail.</p></div>
+  <h3 id="py-errors">3. Transactions and integrity errors</h3>
+  <pre><code class="language-python" data-file="explore_shop_v1.py">
+try:
+    with con:                       # commit if the block succeeds, roll back if it fails
+        con.execute("INSERT INTO orders (order_id, customer_id) VALUES (?, ?)", (9999, 999))
+except sqlite3.IntegrityError as err:
+    print("Blocked by FOREIGN KEY:", err)   # -> FOREIGN KEY constraint failed
+</code></pre>
+  <h3 id="py-run">4. Run it</h3>
+  <pre><code class="language-plaintext" data-file="Command Prompt">
+py build_shop_db.py
+py explore_shop_v1.py
+</code></pre>
+  <details class="expand"><summary>Expected output (abridged)</summary><div class="expand-body">
+  <pre><code class="language-plaintext">
+=== Tables in shop_v1.db ===
+  category         5
+  customer         8
+  inventory       12
+  order_item      23
+  orders          10
+  product         12
+  supplier         5
+  user_account     6
+
+=== Orders for jane.morris@example.com ===
+order_id  order_date  status
+--------  ----------  ---------
+1001      2025-09-25  Delivered
+1004      2025-11-10  Delivered
+1009      2026-01-20  Pending
+
+=== Constraint demonstrations ===
+Blocked by FOREIGN KEY: FOREIGN KEY constraint failed
+Blocked by UNIQUE:      UNIQUE constraint failed: customer.email
+Blocked by CHECK:       CHECK constraint failed: price >= 0
+
+Without PRAGMA foreign_keys = ON the same bad INSERT is ACCEPTED.
+(Rolled back, so the database is unchanged. Always switch foreign keys on!)
+</code></pre></div></details>
+  <div class="callout task"><p class="callout-title">Live coding 4 (lecturer demo)</p><ol>
+    <li>Run <code>build_shop_db.py</code> and open the new <code>shop_v1.db</code> in DB Browser.</li>
+    <li>Run <code>explore_shop_v1.py</code> and match each output block to the code that produced it.</li>
+    <li>Comment out the <code>PRAGMA</code> line and run again. Which demonstration changes, and why?</li>
+    <li>Change the e-mail in step 2 to another customer’s, then to one that does not exist.</li>
+  </ol></div>
+</section>
+
+<section class="lsec">
+  <h2 id="mistakes">Common mistakes and debugging</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Mistake</th><th>Why it is wrong</th><th>Fix</th></tr></thead>
+    <tbody>
+      <tr><td>Lists in a cell: <code>"COM10, COM67"</code></td><td>Not atomic, so not even 1NF. You cannot query or join on it.</td><td>One row per value, in a separate table.</td></tr>
+      <tr><td>Name or phone as primary key</td><td>Not unique: four fruit-shop customers share a phone number.</td><td>A surrogate <code>INTEGER PRIMARY KEY</code>, plus <code>UNIQUE</code> on true candidate keys.</td></tr>
+      <tr><td>Splitting tables but losing the link</td><td>A “lossy” decomposition: you can no longer tell which products were in which order.</td><td>Keep the key columns (and FKs) needed to join back; test with a JOIN.</td></tr>
+      <tr><td>One “quantity” column for two meanings</td><td>Quantity <em>ordered</em> belongs to the order line; quantity <em>in stock</em> belongs to the product.</td><td>Name columns precisely: <code>quantity</code>, <code>qty_in_stock</code>.</td></tr>
+      <tr><td>M:N relationship implemented with no junction table</td><td>Leads to lists in cells or duplicated rows.</td><td>Add an associative table with both FKs.</td></tr>
+      <tr><td>Crow’s foot drawn at the wrong end</td><td>Reverses the meaning (one order per customer).</td><td>Say the “Each … places …” sentence aloud for both directions.</td></tr>
+      <tr><td>Foreign keys drawn as attributes in a Chen diagram</td><td>Chen is conceptual; the relationship already expresses the link.</td><td>Show FKs only in Crow’s Foot and in the schema.</td></tr>
+      <tr><td><code>"Strawberry"</code> or curly quotes copied from slides</td><td>In SQL, double quotes mean an identifier. Curly quotes (<code>“ ”</code>) are a syntax error.</td><td>Use straight single quotes for text: <code>'Strawberry'</code>.</td></tr>
+    </tbody></table></div>
+  <h3 id="errors">Reading SQLite error messages</h3>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Message</th><th>Meaning</th></tr></thead>
+    <tbody>
+      <tr><td><code>FOREIGN KEY constraint failed</code></td><td>The referenced row does not exist, or you tried to delete a parent that still has children (RESTRICT).</td></tr>
+      <tr><td><code>UNIQUE constraint failed: customer.email</code></td><td>That value already exists in a UNIQUE or PRIMARY KEY column.</td></tr>
+      <tr><td><code>NOT NULL constraint failed: product.name</code></td><td>A required column was left empty.</td></tr>
+      <tr><td><code>CHECK constraint failed: quantity &gt; 0</code></td><td>The value broke a CHECK rule.</td></tr>
+      <tr><td><code>near "order": syntax error</code></td><td>You used a reserved word as a table name. Rename it to <code>orders</code>.</td></tr>
+      <tr><td><code>no such table: customer</code></td><td>You are connected to a different (often brand-new, empty) database file. Check the path.</td></tr>
+    </tbody></table></div>
+</section>
+
+<section class="lsec">
+  <h2 id="summary">Summary and next steps</h2>
+  <ul>
+    <li>Data becomes information through processing; a DBMS stores data and protects its integrity.</li>
+    <li>Relational databases suit structured, related data that needs transactions; NoSQL suits huge, flexible or graph-shaped data.</li>
+    <li>Redundancy causes update, insertion and deletion anomalies. Normalisation stores each fact once.</li>
+    <li>1NF: atomic values and a key. 2NF: no partial dependencies. 3NF: no transitive dependencies.</li>
+    <li>ER diagrams show entities, attributes and relationships, each with a cardinality and participation. Crow’s Foot is logical and shows keys; Chen is conceptual and shows relationships as diamonds.</li>
+    <li>Mapping: 1:N → FK on the many side; 1:1 → FK + UNIQUE; M:N → junction table.</li>
+    <li>In SQLite always run <code>PRAGMA foreign_keys = ON</code>, and in Python always use <code>?</code> placeholders.</li>
+  </ul>
+  <div class="callout assess"><p class="callout-title">For your project this week</p><p>Choose your business scenario, write at least seven client requirements, build a flat file with at least five records in Excel, and start normalising it. The Seminar tab walks you through the process on practice data.</p></div>
+  <p><strong>Next week: <a href="week02.html">triggers</a>.</strong> When an order line is inserted, <code>inventory.qty_in_stock</code> should fall automatically, and an order for more items than are in stock should be refused. You will write BEFORE and AFTER triggers on the database you built today.</p>
+  <div class="complete-bar" data-part="lecture"></div>
+</section>
+      </div>
+
+<!-- =========================================================== SEMINAR -->
+      <div class="tabpanel" role="tabpanel" id="panel-seminar" aria-labelledby="tab-seminar" hidden>
+
+<section class="lsec">
+  <h2 id="seminar-plan">Seminar plan</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Time</th><th>Activity</th><th>Format</th></tr></thead>
+    <tbody>
+      <tr><td>0:00–0:15</td><td><a href="#warm-up">1. Warm-up: relational vs NoSQL</a></td><td>Pairs, then whole class</td></tr>
+      <tr><td>0:15–0:50</td><td><a href="#fruit-shop">2. Guided normalisation: fruit shop</a></td><td>Small groups, with tutor check-ins</td></tr>
+      <tr><td>0:50–1:20</td><td><a href="#car-service">3. Independent normalisation: car service centre</a></td><td>Pairs</td></tr>
+      <tr><td>1:20–1:40</td><td><a href="#build-it">4. Build and query it in SQLite</a></td><td>Individual, at the computer</td></tr>
+      <tr><td>1:40–2:00</td><td><a href="#own-project">5. Start your own project</a></td><td>Individual</td></tr>
+      <tr><td>After class</td><td><a href="#student-modules">Challenge task</a> and <a href="#independent">independent practice</a></td><td>Independent</td></tr>
+    </tbody></table></div>
+  <div class="callout rec"><p class="callout-title">How to use the model answers</p><p>Attempt each task <em>before</em> opening its model answer. There is often more than one valid design: compare your reasoning, not just your tables. If yours differs, can you justify it with a dependency or a business rule?</p></div>
+</section>
+
+<section class="lsec">
+  <h2 id="warm-up">Activity 1: Warm-up</h2>
+  <div class="callout seminar"><p class="callout-title">Discuss in pairs (10 minutes)</p><ol>
+    <li>Describe a one-to-one, a one-to-many and a many-to-many relationship, each with an example that is <em>not</em> from the Online Shop.</li>
+    <li>Give two strengths and two weaknesses of relational databases.</li>
+    <li>What do SQL and NoSQL databases have in common, and how do they differ?</li>
+    <li><strong>Keys.</strong> Suggest a primary key for <em>Product</em>, <em>Order</em>, <em>Customer</em> and <em>Sales person</em>. Why not just use the business or person name?</li>
+    <li><strong>Track and artist.</strong> Can a music track belong to more than one artist? Can an artist have more than one track? What kind of relationship is this, and how would you store it?</li>
+    <li>Fill the gaps with “relational” or “NoSQL”:
+      <ul><li>Which databases are table-based, and which are document-based?</li>
+      <li>Which are better for multi-row transactions?</li>
+      <li>Which are better for unstructured data?</li>
+      <li>“Strengths: strong data integrity, data organisation and security. Weaknesses: can be complex and expensive, and struggle with dynamic, unstructured data.”</li>
+      <li>“Strengths: scalability, simplicity, less code, easy maintenance. Weaknesses: less mature, less flexible queries.”</li></ul></li>
+  </ol></div>
+  <details class="expand answer"><summary>Model answers</summary><div class="expand-body">
+    <ol>
+      <li>1:1: a country has one capital city. 1:N: a football club has many players, and each player plays for one club (at a time). M:N: students take many modules, and each module has many students.</li>
+      <li>Strengths: integrity constraints; powerful ad-hoc querying with JOINs; ACID transactions; mature tools and skills. Weaknesses: rigid schema changes; awkward for unstructured data; harder to scale across many servers.</li>
+      <li>Both store and retrieve data persistently and support create/read/update/delete. They differ in data model (tables vs documents, key–value, columns or graphs), schema (fixed vs flexible), query language (standard SQL vs product-specific APIs) and scaling and consistency trade-offs.</li>
+      <li>Product: a product code or surrogate <code>product_id</code>; Order: an order number; Customer: a surrogate <code>customer_id</code> (with e-mail as an alternate key); Sales person: an employee number. Names are not unique (two “James Smith”s), they change (marriage, rebranding) and they are long, so they make poor keys.</li>
+      <li>Yes and yes: a track can feature several artists, and an artist records many tracks. It is many-to-many, implemented with a junction table such as <code>track_artist(track_id, artist_id)</code>.</li>
+      <li>Relational = table-based; NoSQL (document stores) = document-based. Relational is better for multi-row transactions; NoSQL for unstructured data. The first description is relational; the second is NoSQL.</li>
+    </ol></div></details>
+</section>
+
+<section class="lsec">
+  <h2 id="fruit-shop">Activity 2: Guided normalisation: fruit shop</h2>
+  <p>A client gives you this spreadsheet of sales from two shops and asks you to convert it to 1NF, 2NF and 3NF and then build the SQLite database. The data is copied exactly as received, including its mistakes.</p>
+  <div class="table-wrap"><table>
+    <caption>Client flat file (from the Week 1 extra task)</caption>
+    <thead><tr><th>Customer name</th><th>Customer postcode</th><th>Contact phone</th><th>Stock (shop)</th><th>Product name</th><th>Number ordered</th><th>Number left in stock</th></tr></thead>
+    <tbody>
+      <tr><td>Jake</td><td>SO155UP</td><td>0775252362</td><td>Southampton</td><td class="multi">Pomegranate<br>Lime<br>strawberry</td><td class="multi">1<br>2<br>5</td><td class="multi">99<br>18<br>95</td></tr>
+      <tr><td>James</td><td>SO169OP</td><td>0775523256</td><td>Southampton</td><td class="multi">Lime<br>Ice Cream<br>Butter</td><td class="multi">1<br>2<br>1</td><td class="multi">17<br>8<br>29</td></tr>
+      <tr><td>Roman</td><td>SO188IK</td><td>0775252362</td><td>Southampton</td><td class="multi">Candy<br>Lime<br>strawberry</td><td class="multi">2<br>1<br>2</td><td class="multi">18<br>16<br>93</td></tr>
+      <tr><td>Andy</td><td>PO156YH</td><td>0775252362</td><td>Portsmouth</td><td>Ice Cream</td><td>5</td><td>3</td></tr>
+      <tr><td>Karen</td><td>PO127YJ</td><td>0775252362</td><td>Portsmouth</td><td class="multi">Strawberry<br>apple</td><td class="multi">2<br>3</td><td class="multi">91<br>27</td></tr>
+    </tbody></table></div>
+  <div class="callout seminar"><p class="callout-title">Work through these steps</p><ol>
+    <li><strong>Investigate the data.</strong> Can <em>Contact phone</em> identify a customer? Follow <em>Lime</em> and <em>Ice Cream</em> down the “left in stock” column: is stock held per shop, or once for the whole business?</li>
+    <li><strong>1NF.</strong> Remove the repeating group (one row per product sold). Choose a primary key, adding a sale number if nothing suitable exists.</li>
+    <li><strong>List the functional dependencies</strong> and label each one full, partial or transitive.</li>
+    <li><strong>2NF and 3NF.</strong> Decompose step by step, naming every table and marking PKs and FKs.</li>
+    <li><strong>Draw the ERD</strong> in Crow’s Foot. Write the “Each… / Each…” sentences for every relationship.</li>
+  </ol></div>
+  <details class="expand"><summary>Hints</summary><div class="expand-body"><ul>
+    <li>Four customers share <code>0775252362</code>, so the phone number is not a key. You need a surrogate <code>customer_id</code>.</li>
+    <li>Lime goes 18 → 17 → 16 and Ice Cream goes 8 (Southampton) → 3 (Portsmouth). Stock is a single figure per product, and it changes after every sale. Storing it in every sale row is a classic update anomaly.</li>
+    <li>“strawberry” and “Strawberry” are the same product: clean data before normalising.</li>
+  </ul></div></details>
+  <details class="expand answer"><summary>Model answer: tables, ERD and SQL</summary><div class="expand-body">
+    <p><strong>1NF</strong>: <code>sale_line_1nf(<u>sale_no</u>, customer_name, postcode, phone, store, <u>product</u>, qty_ordered, qty_left)</code>: 12 rows, one per product sold. The key is <code>(sale_no, product)</code>, with a sale number added because no existing column identifies a sale.</p>
+    <p><strong>Dependencies</strong>: <code>sale_no → customer, store</code> (partial) · <code>product → qty_left</code> (partial) · <code>customer → postcode, phone</code> (transitive) · <code>(sale_no, product) → qty_ordered</code> (full).</p>
+    <p><strong>3NF</strong>: <code>customer(<u>customer_id</u>, customer_name, postcode, phone)</code> · <code>store(<u>store_id</u>, store_name)</code> · <code>product(<u>product_id</u>, product_name, qty_in_stock)</code> · <code>sale(<u>sale_id</u>, customer_id FK, store_id FK)</code> · <code>sale_line(<u>sale_id</u> FK, <u>product_id</u> FK, qty_ordered)</code>.</p>
+    <div class="erd-widget" data-model="fruitshop" data-lock="crow"></div>
+    <p>Run the model-answer SQL (from <code>seminar/fruit_shop_3nf.sql</code>) and check that the JOIN rebuilds the original sheet:</p>
+    <div class="playground" data-db="empty" data-setup-src="downloads/week01/seminar/fruit_shop_3nf.sql" data-title="Fruit shop 3NF: model answer loaded">
+<script type="text/plain" class="pg-sql">
+SELECT c.customer_name, st.store_name, p.product_name, sl.qty_ordered
+FROM sale s
+JOIN customer  c  ON c.customer_id = s.customer_id
+JOIN store     st ON st.store_id   = s.store_id
+JOIN sale_line sl ON sl.sale_id    = s.sale_id
+JOIN product   p  ON p.product_id  = sl.product_id
+ORDER BY s.sale_id, p.product_name;
+</script>
+    </div>
+    <p class="small muted">Extension: the final stock figure is stored once per product. Next week a trigger will reduce it automatically on every sale.</p>
+  </div></details>
+</section>
+
+<section class="lsec">
+  <h2 id="car-service">Activity 3: Car service centre</h2>
+  <p>Normalise this flat file to 3NF, in pairs, using the same steps as Activity 2. List any assumptions you have to make: the data has some gaps.</p>
+  <div class="table-wrap"><table>
+    <caption>Client flat file (from the Week 1 extra tasks)</caption>
+    <thead><tr><th>Owner name</th><th>Car registration</th><th>Owner phone</th><th>Service centre</th><th>Service history</th><th>Charge (£)</th></tr></thead>
+    <tbody>
+      <tr><td>Jake</td><td>AV15HUP</td><td>0775252362</td><td>Southampton</td><td class="multi">Oil change<br>Filter change<br>Tyre change</td><td class="multi">100<br>20<br>50</td></tr>
+      <tr><td>James</td><td class="multi">HN16YOP<br>NN71KLM</td><td>0775523256</td><td>Southampton</td><td>Tyre change</td><td>50</td></tr>
+      <tr><td>Roman</td><td class="multi">OP18KIK<br>NM09JKL</td><td>0775252362</td><td>Southampton</td><td class="multi">Lock change<br>Tyre change</td><td>150</td></tr>
+      <tr><td>Andy</td><td>PK15KYH</td><td>0775252362</td><td>Portsmouth</td><td>Oil change</td><td>100</td></tr>
+      <tr><td>Karen</td><td>NN12MYJ</td><td>0775252362</td><td>Portsmouth</td><td class="multi">Tyre change<br>Oil change</td><td class="multi">50<br>100</td></tr>
+    </tbody></table></div>
+  <details class="expand"><summary>Hints</summary><div class="expand-body"><ul>
+    <li>Which car did James’s tyre change belong to? Which of Roman’s cars had which service? The sheet does not say: state an assumption.</li>
+    <li>Roman’s row has two services but only one charge. What is missing?</li>
+    <li>Look at the charges: does a tyre change always cost the same? What does the charge really depend on?</li>
+  </ul></div></details>
+  <details class="expand answer"><summary>Model answer</summary><div class="expand-body">
+    <p><code>owner(<u>owner_id</u>, owner_name, phone)</code> · <code>car(<u>reg_no</u>, owner_id FK)</code> · <code>service_centre(<u>centre_id</u>, centre_name)</code> · <code>service_type(<u>service_code</u>, description, standard_charge)</code> · <code>service_job(<u>job_id</u>, reg_no FK, centre_id FK, service_code FK, service_date)</code></p>
+    <ul>
+      <li>The charge depends only on the service type (oil £100, filter £20, tyre £50, lock £150), so storing it in every job would be a transitive dependency. It lives in <code>service_type</code>. If garages could give discounts, an <code>amount_charged</code> column on the job would be a separate fact, like <code>unit_price</code> in the shop.</li>
+      <li><code>reg_no</code> is a natural key that suits a car well. Declare it <code>TEXT PRIMARY KEY NOT NULL</code>.</li>
+      <li>Assumptions are recorded at the top of <code>seminar/car_service_3nf.sql</code>.</li>
+    </ul>
+    <div class="playground" data-db="empty" data-setup-src="downloads/week01/seminar/car_service_3nf.sql" data-title="Car service 3NF: model answer loaded">
+<script type="text/plain" class="pg-sql">
+-- Rebuild the service history with the charge for each job
+SELECT o.owner_name, j.reg_no, sc.centre_name, t.description, t.standard_charge
+FROM service_job j
+JOIN car c             ON c.reg_no = j.reg_no
+JOIN owner o           ON o.owner_id = c.owner_id
+JOIN service_centre sc ON sc.centre_id = j.centre_id
+JOIN service_type t    ON t.service_code = j.service_code
+ORDER BY o.owner_id, j.job_id;
+</script>
+    </div>
+  </div></details>
+</section>
+
+<section class="lsec">
+  <h2 id="build-it">Activity 4: Build and query it in SQLite</h2>
+  <div class="callout seminar"><p class="callout-title">At the computer</p><ol>
+    <li>Download the Week 1 files (Resources tab), run <code>py build_shop_db.py</code>, and open <code>shop_v1.db</code> in DB Browser for SQLite.</li>
+    <li>In <em>Execute SQL</em>, or in the playground below, answer the questions. Each needs a JOIN.</li>
+  </ol></div>
+  <div class="playground" data-db="shop_v1" data-title="Your queries">
+<script type="text/plain" class="pg-sql">
+-- Q1. List every product with its category name and supplier name.
+-- Q2. Which products are at or below their reorder level?
+-- Q3. List Jane Morris's order lines (order id, product name, quantity).
+-- Q4. Try to delete supplier 5 (Meadow Dairy). What happens, and why?
+
+SELECT * FROM product;
+</script>
+  </div>
+  <details class="expand answer"><summary>Model answers</summary><div class="expand-body">
+  <pre><code class="language-sql" data-test="shop_v1">
+-- Q1
+SELECT p.name, c.name AS category, s.name AS supplier
+FROM product p
+JOIN category c ON c.category_id = p.category_id
+JOIN supplier s ON s.supplier_id = p.supplier_id
+ORDER BY p.name;
+
+-- Q2
+SELECT p.name, i.qty_in_stock, i.reorder_level
+FROM inventory i JOIN product p ON p.product_id = i.product_id
+WHERE i.qty_in_stock <= i.reorder_level;
+
+-- Q3
+SELECT o.order_id, p.name, oi.quantity
+FROM customer c
+JOIN orders o      ON o.customer_id = c.customer_id
+JOIN order_item oi ON oi.order_id   = o.order_id
+JOIN product p     ON p.product_id  = oi.product_id
+WHERE c.email = 'jane.morris@example.com'
+ORDER BY o.order_id;
+</code></pre>
+  <p><strong>Q2</strong> returns Croissants (8 ≤ 10), Cheddar (4 ≤ 10) and Margherita Pizza (15 ≤ 15). <strong>Q4</strong>: <code>DELETE FROM supplier WHERE supplier_id = 5;</code> fails with <em>FOREIGN KEY constraint failed</em>, because <code>product.supplier_id</code> uses <code>ON DELETE RESTRICT</code> and Meadow Dairy still supplies Butter and Cheddar.</p>
+  </div></details>
+</section>
+
+<section class="lsec">
+  <h2 id="own-project">Activity 5: Start your own project</h2>
+  <div class="callout assess"><p class="callout-title">Part 1 of the assessment</p><p>Your project uses a business of <strong>your own choice</strong> (a bank, restaurant, clinic, gym, library, car dealer…). It needs at least seven client requirements, an Excel flat file with at least five records, normalisation from 1NF to 3NF, an ERD and a SQLite database with at least five substantial tables, each holding at least five records.</p></div>
+  <ul class="checklist" data-id="week01-project">
+    <li><span>Choose a business scenario and write two or three sentences describing it.</span></li>
+    <li><span>Write at least seven client requirements, each starting “The system must…”.</span></li>
+    <li><span>Build the flat file in Excel with at least five realistic records (invent the data).</span></li>
+    <li><span>Normalise to 1NF, 2NF and 3NF, listing the dependencies at each step.</span></li>
+    <li><span>Draw the ERD in Crow’s Foot (draw.io or similar) and check every cardinality against a requirement.</span></li>
+    <li><span>Write the CREATE TABLE statements with PKs, FKs, NOT NULL, UNIQUE and CHECK constraints.</span></li>
+  </ul>
+  <div class="callout warn"><p class="callout-title">Academic integrity</p><p>Use the Online Shop and the seminar tasks to <em>learn</em> the method, then apply it to your own scenario. Generative AI tools are not permitted for any part of the assessment.</p></div>
+</section>
+
+<section class="lsec">
+  <h2 id="student-modules">Challenge: student enrolment</h2>
+  <p>Normalise this sheet to 3NF. Watch for values that look different but mean the same thing, and for a dependency chain three links long.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Student name</th><th>Module number</th><th>Mobile</th><th>Country of residence</th><th>Home phone</th><th>University fee (£)</th></tr></thead>
+    <tbody>
+      <tr><td>Jake Green</td><td class="multi">COM10<br>COM67</td><td>0775252362</td><td>UK</td><td>0280909898</td><td>9250</td></tr>
+      <tr><td>James Smith</td><td class="multi">COM10<br>COM56</td><td>0775523256</td><td>UK</td><td>0230909898</td><td>9250</td></tr>
+      <tr><td>Roman Morris</td><td class="multi">COM56<br>COM 67<br>COM10</td><td>0775252362</td><td>Germany</td><td>+97670909898</td><td>16000</td></tr>
+      <tr><td>Andy Smith</td><td class="multi">COM67, COM45</td><td>0775252362</td><td>UK</td><td>0280009898</td><td>9250</td></tr>
+      <tr><td>Karen Helord</td><td class="multi">COM88,COM68</td><td>0775252362</td><td>France</td><td>+8700787898</td><td>16000</td></tr>
+    </tbody></table></div>
+  <details class="expand answer"><summary>Model answer</summary><div class="expand-body">
+    <ul>
+      <li>Clean first: “COM 67” = “COM67”; module lists are written three different ways.</li>
+      <li>Chain: <code>student → country → fee_status → annual_fee</code>. UK students pay the home fee, international students (including EU students in England since 2021) the international fee.</li>
+    </ul>
+    <p><code>fee_status(<u>fee_status</u>, annual_fee)</code> · <code>country(<u>country_id</u>, country_name, fee_status FK)</code> · <code>student(<u>student_id</u>, first_name, last_name, mobile, home_phone, country_id FK)</code> · <code>module(<u>module_code</u>)</code> · <code>enrolment(<u>student_id</u> FK, <u>module_code</u> FK)</code></p>
+    <div class="playground" data-db="empty" data-setup-src="downloads/week01/seminar/student_enrolment_3nf.sql" data-title="Student enrolment 3NF: model answer loaded">
+<script type="text/plain" class="pg-sql">
+-- Each student's fee is derived through the chain, never stored on the student
+SELECT s.first_name || ' ' || s.last_name AS student, c.country_name, f.fee_status, f.annual_fee,
+       COUNT(e.module_code) AS modules
+FROM student s
+JOIN country c    ON c.country_id = s.country_id
+JOIN fee_status f ON f.fee_status = c.fee_status
+LEFT JOIN enrolment e ON e.student_id = s.student_id
+GROUP BY s.student_id
+ORDER BY s.student_id;
+</script>
+    </div>
+  </div></details>
+</section>
+
+<section class="lsec">
+  <h2 id="independent">Independent practice</h2>
+  <ol>
+    <li><strong>Chen by hand.</strong> Without looking, draw the Online Shop in Chen notation from the Crow’s Foot version, then compare it using the notation toggle in the lecture.</li>
+    <li><strong>Library.</strong> Members borrow copies of books; a book has many copies and many authors; a loan has a due date. Identify the entities, write the cardinality rules, draw the ERD and resolve every M:N.</li>
+    <li><strong>Cinema booking.</strong> Normalise: <em>booking_ref, customer, email, film, rating, screen, show_time, seat_list, price_band, price</em>. What is the repeating group? What determines price?</li>
+    <li><strong>BCNF.</strong> In <code>(student, module, tutor)</code>, each tutor teaches one module and each student has one tutor per module. Show that this is in 3NF but not BCNF, and decompose it.</li>
+    <li><strong>Extend the shop.</strong> Add a <em>review</em> entity (a customer reviews a product they bought: rating 1–5, comment, date). Draw it, map it, and write its <code>CREATE TABLE</code> with suitable constraints. Test it in a playground.</li>
+  </ol>
+  <div class="complete-bar" data-part="seminar"></div>
+</section>
+      </div>
+
+<!-- =========================================================== SELF-CHECK -->
+      <div class="tabpanel" role="tabpanel" id="panel-selfcheck" aria-labelledby="tab-selfcheck" hidden>
+<section class="lsec">
+  <h2 id="quiz">Self-assessment quiz</h2>
+  <p>Fourteen questions on this week’s lecture. Score 70% or more to complete this part of the week; you can retake the quiz as often as you like.</p>
+  <div class="quiz" data-title="Week 1: Normalisation & ER diagrams" data-progress="week01">
+<script type="application/json">
+[
+ {"q":"Which statement best describes <em>information</em> rather than <em>data</em>?","options":["<code>1001, 2025-09-25, 0.80</code>","A column called <code>order_date</code>","“Drinks were 40% of last month’s orders”","A CSV file of customer records"],"answer":2,"explain":"Information is processed, contextualised data that supports a decision. The others are raw data or structures that hold data."},
+ {"q":"A table is in 1NF, its primary key is <code>(order_no, product)</code> and it contains <code>order_date</code>. Which dependency stops it being in 2NF?","options":["<code>(order_no, product) → qty</code>","<code>order_no → order_date</code>","<code>supplier → supplier_phone</code>","<code>email → phone</code>"],"answer":1,"explain":"<code>order_date</code> depends on only part of the composite key: a partial dependency, which 2NF forbids."},
+ {"q":"<code>product(product_id, name, supplier_id, supplier_phone)</code> breaks 3NF because…","options":["it has a surrogate key","<code>supplier_phone</code> depends on <code>supplier_id</code>, a non-key attribute","<code>name</code> is not unique","it has no composite key"],"answer":1,"explain":"<code>product_id → supplier_id → supplier_phone</code> is a transitive dependency. Move supplier_phone into a supplier table."},
+ {"q":"Deleting the only order for a customer also deletes the only record of that customer’s address. This is…","options":["an update anomaly","an insertion anomaly","a deletion anomaly","a referential action"],"answer":2,"explain":"A deletion anomaly: unrelated facts stored in the same row disappear together."},
+ {"q":"Why do the sample rows alone not prove that <code>phone → customer</code>?","options":["Phones are text","Sample data can only disprove a dependency; business rules establish it","Dependencies only exist between keys","SQLite does not support dependencies"],"answer":1,"explain":"One counter-example (two customers with the same phone, as in the fruit shop) disproves it; no number of agreeing rows proves it."},
+ {"q":"In Crow’s Foot, the symbol beside ORDERS on the CUSTOMER–ORDERS line is a circle followed by a crow’s foot. It means…","options":["each order has zero or many customers","each customer places zero or many orders","each customer places exactly one order","the relationship is optional for orders"],"answer":1,"explain":"Look-across: the symbol next to ORDERS says how many orders relate to one customer. Circle = minimum 0, crow’s foot = maximum many."},
+ {"q":"In Chen notation, a double line between ORDERS and the PLACES diamond shows that…","options":["the relationship is many-to-many","ORDERS has total participation: every order must be placed by a customer","ORDERS is a weak entity","there are two foreign keys"],"answer":1,"explain":"Double line = total (mandatory) participation of that entity in the relationship."},
+ {"q":"How is a one-to-one relationship between <code>customer</code> and <code>user_account</code> enforced in SQLite?","options":["A foreign key in both tables","<code>user_account.customer_id</code> as a foreign key with UNIQUE","A junction table","It cannot be enforced"],"answer":1,"explain":"A foreign key alone allows many accounts per customer; UNIQUE limits it to one."},
+ {"q":"How should an M:N relationship between ORDERS and PRODUCT be implemented?","options":["A <code>product_ids</code> text column in orders","An <code>order_id</code> column in product","A junction table with both foreign keys as a composite primary key","Two foreign keys in orders"],"answer":2,"explain":"A junction (associative) table such as <code>order_item(order_id, product_id, quantity, unit_price)</code> resolves the M:N."},
+ {"q":"Which statement about Chen notation is correct?","options":["Foreign keys are shown as underlined attributes","Relationships are drawn as diamonds and can have their own attributes","Cardinality is shown with crow’s feet","It is the default in MySQL Workbench"],"answer":1,"explain":"Chen shows relationships as diamonds, which can own attributes such as quantity. It does not show foreign keys."},
+ {"q":"Your Python script inserts an order for customer 999 (who does not exist) and SQLite accepts it. The most likely cause is…","options":["customer_id is not INTEGER","<code>PRAGMA foreign_keys = ON</code> was not run on that connection","SQLite does not support foreign keys","the table is called orders"],"answer":1,"explain":"Foreign-key enforcement is off by default and must be switched on for every connection."},
+ {"q":"In the 1NF order table, which statement about the key is correct?","options":["<code>order_no</code> is the primary key","<code>product</code> is the primary key","<code>(order_no, product)</code> together form one composite primary key","There are two separate primary keys"],"answer":2,"explain":"Neither column is unique alone (order 1001 has two rows; Cola is in two orders). The pair is unique, so the two columns together are a single composite key."},
+ {"q":"When the Chen relationship CONTAINS (M:N, with attribute quantity) is mapped to tables, what happens?","options":["quantity is added to orders","quantity is added to product","a new table order_item(order_id, product_id, quantity) is created, with a composite PK of the two FKs","nothing: SQLite supports M:N directly"],"answer":2,"explain":"An M:N relationship becomes an associative table. Its attributes become that table’s columns, and one M:N line becomes two identifying 1:N lines."},
+ {"q":"<code>order_item.unit_price</code> repeats a value that also appears in <code>product.price</code>. Is it redundant?","options":["Yes: remove it to reach 3NF","No: it records the price charged at the time of sale, which can differ from today’s price","Yes, but SQLite requires it","No, because it is a foreign key"],"answer":1,"explain":"It is a different fact (historical price charged). Cola cost £0.80 in 2025 orders and £0.85 today."}
+]
+</script>
+  </div>
+  <h3 id="exit-ticket">Exit ticket</h3>
+  <p>Answer in one or two sentences each, then compare with a classmate:</p>
+  <ol>
+    <li>In your own words, what is the difference between a partial and a transitive dependency?</li>
+    <li>Why does the Online Shop store <code>unit_price</code> in <code>order_item</code>?</li>
+    <li>Which part of today’s lecture would you most like explained again?</li>
+  </ol>
+  <h3 id="before-next-week">Before next week</h3>
+  <ul class="checklist" data-id="week01-before">
+    <li><span>Build <code>shop_v1.db</code> on your own computer and open it in DB Browser.</span></li>
+    <li><span>Have your project scenario and seven requirements drafted.</span></li>
+    <li><span>Have a 1NF version of your own flat file.</span></li>
+  </ul>
+</section>
+      </div>
+
+<!-- =========================================================== RESOURCES -->
+      <div class="tabpanel" role="tabpanel" id="panel-resources" aria-labelledby="tab-resources" hidden>
+<section class="lsec">
+  <h2 id="resources-downloads">Downloads</h2>
+  <p>Everything needs only the Python standard library. Unzip into one folder and run the scripts from there.</p>
+  <ul class="dl-list">
+    <li><span class="ext">zip</span><span class="what"><a href="../downloads/week01/qho541_week01_files.zip" download>qho541_week01_files.zip</a><span class="d">All the files below in one download</span></span></li>
+    <li><span class="ext">db</span><span class="what"><a href="../downloads/week01/shop_v1.db" download>shop_v1.db</a><span class="d">Ready-made Online Shop database (open in DB Browser for SQLite)</span></span></li>
+    <li><span class="ext">sql</span><span class="what"><a href="../downloads/week01/schema_v1.sql" download>schema_v1.sql</a><span class="d">CREATE TABLE statements: the 3NF schema with all constraints</span></span></li>
+    <li><span class="ext">sql</span><span class="what"><a href="../downloads/week01/seed_v1.sql" download>seed_v1.sql</a><span class="d">Sample data: every table has five or more rows</span></span></li>
+    <li><span class="ext">py</span><span class="what"><a href="../downloads/week01/build_shop_db.py" download>build_shop_db.py</a><span class="d">Rebuilds shop_v1.db from the two SQL files and checks integrity</span></span></li>
+    <li><span class="ext">py</span><span class="what"><a href="../downloads/week01/explore_shop_v1.py" download>explore_shop_v1.py</a><span class="d">Lecture worked example: JOINs, parameterised queries, constraints</span></span></li>
+    <li><span class="ext">sql</span><span class="what"><a href="../downloads/week01/unary_emp.sql" download>unary_emp.sql</a><span class="d">Unary relationship example: the EMP table where employees manage employees</span></span></li>
+    <li><span class="ext">xlsx</span><span class="what"><a href="../downloads/week01/week01_normalisation_walkthrough.xlsx" download>week01_normalisation_walkthrough.xlsx</a><span class="d">UNF → 1NF → 2NF → 3NF worked example, one sheet per step</span></span></li>
+    <li><span class="ext">sql</span><span class="what"><a href="../downloads/week01/seminar/fruit_shop_3nf.sql" download>seminar/fruit_shop_3nf.sql</a><span class="d">Seminar Activity 2 model answer</span></span></li>
+    <li><span class="ext">sql</span><span class="what"><a href="../downloads/week01/seminar/car_service_3nf.sql" download>seminar/car_service_3nf.sql</a><span class="d">Seminar Activity 3 model answer</span></span></li>
+    <li><span class="ext">sql</span><span class="what"><a href="../downloads/week01/seminar/student_enrolment_3nf.sql" download>seminar/student_enrolment_3nf.sql</a><span class="d">Challenge task model answer</span></span></li>
+  </ul>
+  <p class="small muted">Diagrams: every ER diagram on this page has a <strong>Download SVG</strong> button that saves it in the notation currently shown, ready for slides or handouts.</p>
+</section>
+<section class="lsec">
+  <h2 id="further-reading">Further learning</h2>
+  <ul>
+    <li>SQLite documentation: <a href="https://www.sqlite.org/foreignkeys.html">Foreign key support</a> · <a href="https://www.sqlite.org/lang_createtable.html">CREATE TABLE</a> · <a href="https://www.sqlite.org/datatype3.html">Datatypes and type affinity</a></li>
+    <li>Python documentation: <a href="https://docs.python.org/3/library/sqlite3.html">sqlite3, the DB-API 2.0 interface for SQLite</a></li>
+    <li><a href="https://sqlitebrowser.org/">DB Browser for SQLite</a> and <a href="https://app.diagrams.net/">diagrams.net (draw.io)</a>, which has Crow’s Foot and Chen shape libraries</li>
+    <li>Connolly, T. and Begg, C. <em>Database Systems: A Practical Approach to Design, Implementation, and Management</em>, chapters on normalisation and ER modelling.</li>
+    <li>Elmasri, R. and Navathe, S. <em>Fundamentals of Database Systems</em>: the standard reference for Chen-style ER notation and mapping ER to relations.</li>
+    <li>Chen, P. P. (1976) “The Entity-Relationship Model: Toward a Unified View of Data”, <em>ACM Transactions on Database Systems</em>, 1(1), pp. 9–36.</li>
+  </ul>
+</section>
+<section class="lsec">
+  <h2 id="glossary">Glossary</h2>
+  <dl class="terms">
+    <dt>Anomaly</dt><dd>An inconsistency caused by redundancy when inserting, updating or deleting.</dd>
+    <dt>Associative entity</dt><dd>An entity (junction table) that resolves an M:N relationship.</dd>
+    <dt>Cardinality (ER)</dt><dd>The maximum number of instances on one side of a relationship (one or many).</dd>
+    <dt>Determinant</dt><dd>The left-hand side of a functional dependency.</dd>
+    <dt>Functional dependency</dt><dd><code>X → Y</code>: each X value determines exactly one Y value.</dd>
+    <dt>Lossless decomposition</dt><dd>Splitting a table so that joining the parts gives back exactly the original data.</dd>
+    <dt>Participation</dt><dd>Whether every instance must take part in a relationship (total/mandatory) or need not (partial/optional).</dd>
+    <dt>Referential integrity</dt><dd>Every foreign key value matches an existing key in the referenced table.</dd>
+    <dt>Surrogate key</dt><dd>A system-generated key with no business meaning.</dd>
+    <dt>Weak entity</dt><dd>An entity identified partly or wholly through its owner entity.</dd>
+  </dl>
+</section>
+<section class="lsec">
+  <h2 id="sources">Source materials</h2>
+  <p>This lesson reorganises and extends the original Week 1 teaching materials:</p>
+  <div class="table-wrap"><table class="source-map">
+    <thead><tr><th>Original file</th><th>Used in</th></tr></thead>
+    <tbody>
+      <tr><td>Data - Relational Database - DB Normalization.pptx</td><td>Data &amp; information (DIKW), flat files, Codd’s relational model, relational vs NoSQL, keys and “why not a name?”, relationships and cardinality (track/artist, vehicle/owner), SQL sub-languages incl. DQL, normal forms, seminar warm-up (Tasks 2–3), “Beyond 3NF” (extra task). The movie-rental 1NF–3NF example (slides 37–43) is replaced by the Online Shop walkthrough so one case study runs throughout.</td></tr>
+      <tr><td>Week 6 NoSQL (1).pptx (relational recap and ERD slides)</td><td>Relational model, ER concepts, Crow’s Foot reading, unary relationships</td></tr>
+      <tr><td>Flat file NF1 to NF3 Example.xlsx · Example Normalisation Flat File - 3NF.xlsx</td><td>Normalisation stepper, anomaly lab and walkthrough workbook (data corrected: the original 2NF step lost the order–product link)</td></tr>
+      <tr><td>WEEK 2 extra tasks NF / Normalization Forms (3).pptx</td><td>Seminar Activity 2 (fruit shop)</td></tr>
+      <tr><td>WEEK 2 extra tasks NF / Normalization Forms extra tasks (2).pptx</td><td>Seminar Activity 3 (car service) and the challenge (student enrolment)</td></tr>
+      <tr><td>Database.db</td><td>EMP table reused for the unary-relationship example (<code>unary_emp.sql</code>); the rest is replaced by the Online Shop <code>shop_v1.db</code></td></tr>
+      <tr><td>SQL Query Optimizations.pptx</td><td>Moved to Week 3 (views, functions and query optimisation)</td></tr>
+    </tbody></table></div>
+</section>
+      </div>
+
+      <nav class="pager" aria-label="Lesson navigation">
+        <a href="../setup.html"><span class="dir">Previous</span>Setup &amp; tools</a>
+        <a class="next" href="week02.html"><span class="dir">Next</span>Week 2 · Database triggers</a>
+      </nav>
+      <footer class="site-footer" id="site-footer"></footer>
+    </main>
+    <aside class="toc" id="toc" aria-label="On this page"></aside>
+  </div>
+</div>
+<script src="../assets/vendor/highlight/highlight.min.js"></script>
+<script src="../assets/vendor/codemirror/codemirror.js"></script>
+<script src="../assets/vendor/codemirror/mode/sql.js"></script>
+<script src="../assets/vendor/codemirror/matchbrackets.js"></script>
+<script src="../assets/vendor/sqljs/sql-wasm.js"></script>
+<script src="../assets/js/site.js"></script>
+<script src="../assets/js/erd-models.js"></script>
+<script src="../assets/js/erd.js"></script>
+<script src="../assets/js/sql-playground.js"></script>
+<script src="../assets/js/normalise.js"></script>
+<script src="../assets/js/quiz.js"></script>
+</body>
+</html>

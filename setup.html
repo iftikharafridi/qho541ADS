@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Setup &amp; tools · QHO541</title>
+<meta name="description" content="Install and check Python, Tkinter, SQLite and DB Browser for SQLite on Windows for QHO541, and run the teaching site locally.">
+<script>(function(){var p="auto";try{p=localStorage.getItem("qho541.theme")||"auto"}catch(e){}var d=p==="dark"||(p==="auto"&&window.matchMedia&&matchMedia("(prefers-color-scheme: dark)").matches);document.documentElement.setAttribute("data-theme",d?"dark":"light")})();</script>
+<link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/css/site.css">
+</head>
+<body data-root="" data-page="setup">
+<a class="skip-link" href="#content">Skip to content</a>
+<header class="site-header" id="site-header"></header>
+<div class="layout">
+  <nav class="sidebar" id="sidebar" aria-label="Course navigation"></nav>
+  <div class="scrim"></div>
+  <div class="main">
+    <main class="content" id="content">
+      <div class="breadcrumb"><a href="index.html">Home</a> / Setup &amp; tools</div>
+      <div class="hero">
+        <div class="eyebrow">Before Week 1</div>
+        <h1>Setup &amp; tools</h1>
+        <p class="lede">Everything for this module runs on a normal Windows laptop with free software. The core tools are Python (which already contains SQLite and Tkinter) and DB Browser for SQLite.</p>
+      </div>
+
+      <h2 id="what-you-need">What you need</h2>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Tool</th><th>Why</th><th>Cost / install</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Python 3.11 or newer</strong></td><td>Runs every example. Includes the <code>sqlite3</code> and <code>tkinter</code> modules, so no extra packages are needed for the database and GUI work.</td><td>Free · python.org</td></tr>
+          <tr><td><strong>DB Browser for SQLite</strong></td><td>A visual tool to open <code>.db</code> files, browse tables, run SQL and check your schema.</td><td>Free · sqlitebrowser.org</td></tr>
+          <tr><td><strong>A code editor</strong></td><td>VS Code (with the Python extension), PyCharm Community or IDLE (installed with Python).</td><td>Free</td></tr>
+          <tr><td>Microsoft Excel</td><td>The flat file for Part 1 of the assessment.</td><td>Office 365</td></tr>
+          <tr><td>A diagram tool</td><td>For ER diagrams: diagrams.net (draw.io) has Crow’s Foot and Chen shapes.</td><td>Free · app.diagrams.net</td></tr>
+        </tbody></table></div>
+
+      <div class="callout rec"><p class="callout-title">Teaching recommendation: keep dependencies small</p>
+        <p>Weeks 1–5 use <strong>only the Python standard library</strong>. Later weeks may add one small package where it is the sensible choice (for example <code>cryptography</code> for reversible encryption). Each week’s page lists exactly what to install and why. Fewer packages means fewer “it works on my machine” problems when your submission is marked.</p></div>
+
+      <h2 id="install-python">Install Python on Windows</h2>
+      <ol class="steps">
+        <li>Download the latest <strong>Windows installer (64-bit)</strong> from <a href="https://www.python.org/downloads/windows/">python.org/downloads/windows</a>.</li>
+        <li>Run it. On the first screen tick <strong>“Add python.exe to PATH”</strong>, then choose <strong>Customize installation</strong>.</li>
+        <li>Make sure <strong>“tcl/tk and IDLE”</strong> and <strong>“py launcher”</strong> are ticked (they are by default). Tkinter needs tcl/tk.</li>
+        <li>Finish the install, then open a <em>new</em> Command Prompt or PowerShell window and run the checks below.</li>
+      </ol>
+      <pre><code class="language-plaintext" data-file="Command Prompt / PowerShell">
+py --version
+py -c "import sqlite3; print('SQLite', sqlite3.sqlite_version)"
+py -m tkinter
+</code></pre>
+      <p>You should see a Python version (3.11 or newer), an SQLite version (3.35 or newer), and a small Tk window with two buttons. Close it to finish.</p>
+      <div class="callout note"><p class="callout-title">py or python?</p><p>On Windows the <code>py</code> launcher always finds your newest Python, even if PATH is wrong. On macOS and Linux use <code>python3</code> instead of <code>py</code>. All instructions on this site work with either.</p></div>
+
+      <h2 id="project-folder">Create a project folder</h2>
+      <p>Keep each week’s files together and run scripts <em>from inside that folder</em>. The example scripts find their databases relative to their own location, so they work wherever you put the folder. You will not see hard-coded <code>C:\Users\…</code> paths anywhere.</p>
+      <pre><code class="language-plaintext" data-file="PowerShell">
+mkdir $HOME\Documents\QHO541
+cd $HOME\Documents\QHO541
+# optional but good practice: a virtual environment for later weeks
+py -m venv .venv
+.venv\Scripts\Activate.ps1
+</code></pre>
+      <div class="callout note"><p class="callout-title">PowerShell says “running scripts is disabled”</p><p>Run <code>Set-ExecutionPolicy -Scope CurrentUser RemoteSigned</code> once, or use Command Prompt and <code>.venv\Scripts\activate.bat</code>. A virtual environment is not needed for Weeks 1–5.</p></div>
+
+      <h2 id="db-browser">DB Browser for SQLite</h2>
+      <ol class="steps">
+        <li>Download the Windows installer from <a href="https://sqlitebrowser.org/dl/">sqlitebrowser.org/dl</a> and install it.</li>
+        <li><strong>Open Database</strong> and choose <code>shop_v1.db</code> (from Week 1 → Resources).</li>
+        <li><strong>Database Structure</strong> shows tables and columns; <strong>Browse Data</strong> shows rows; <strong>Execute SQL</strong> runs queries. Press <kbd>Ctrl</kbd>+<kbd>Enter</kbd> or <kbd>F5</kbd> to run.</li>
+        <li>On the <strong>Edit Pragmas</strong> tab check that <strong>Foreign Keys</strong> is ticked, so foreign keys are enforced while you work.</li>
+        <li>After changing data, click <strong>Write Changes</strong> (<kbd>Ctrl</kbd>+<kbd>S</kbd>). Until you do, the file stays locked and Python may report <code>database is locked</code>.</li>
+      </ol>
+
+      <h2 id="run-examples">Run the Week 1 examples</h2>
+      <p>Download the Week 1 files (Week 1 → Resources), unzip them into your project folder, then:</p>
+      <pre><code class="language-plaintext" data-file="Command Prompt">
+cd %USERPROFILE%\Documents\QHO541\week01
+py build_shop_db.py
+py explore_shop_v1.py
+</code></pre>
+      <p><code>build_shop_db.py</code> creates <code>shop_v1.db</code> from <code>schema_v1.sql</code> and <code>seed_v1.sql</code> and prints a row count for every table. <code>explore_shop_v1.py</code> runs the worked examples from the lecture.</p>
+
+      <h2 id="run-site">Run this site locally</h2>
+      <p>The site is plain HTML, CSS and JavaScript with no build step. The SQL playgrounds load a WebAssembly build of SQLite and a database file, and browsers only allow that over <code>http://</code>. Double-clicking <code>index.html</code> opens it as <code>file://</code> instead, so start a small local web server:</p>
+      <pre><code class="language-plaintext" data-file="Command Prompt (in the site folder)">
+py -m http.server 8000
+</code></pre>
+      <p>Then open <a href="http://localhost:8000/">http://localhost:8000/</a>. Press <kbd>Ctrl</kbd>+<kbd>C</kbd> in the terminal to stop the server. Everything the site needs is included locally, so it works without an internet connection, which is useful in classrooms with unreliable Wi-Fi.</p>
+
+      <h2 id="troubleshooting">Troubleshooting</h2>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Message or symptom</th><th>Likely cause</th><th>Fix</th></tr></thead>
+        <tbody>
+          <tr><td><code>'python' is not recognized…</code></td><td>Python is not on PATH.</td><td>Use <code>py</code> instead, or reinstall with “Add python.exe to PATH” ticked.</td></tr>
+          <tr><td><code>ModuleNotFoundError: No module named 'tkinter'</code></td><td>tcl/tk was not installed.</td><td>Re-run the installer → <em>Modify</em> → tick “tcl/tk and IDLE”.</td></tr>
+          <tr><td><code>sqlite3.OperationalError: no such table: customer</code></td><td>Python opened (and created) a <em>different, empty</em> database file, usually because the script ran from another folder.</td><td>Build paths from the script’s folder with <code>Path(__file__).resolve().parent</code> (as the examples do), and delete the stray empty <code>.db</code> file.</td></tr>
+          <tr><td><code>database is locked</code></td><td>Another program has uncommitted changes open.</td><td>In DB Browser click <em>Write Changes</em> or <em>Close Database</em>, then retry.</td></tr>
+          <tr><td>Foreign keys are not enforced</td><td>SQLite starts every connection with foreign keys OFF.</td><td>Run <code>PRAGMA foreign_keys = ON;</code> straight after connecting, every time.</td></tr>
+          <tr><td>The SQL playground says it could not start SQLite</td><td>The page was opened as a <code>file://</code> URL.</td><td>Use <code>py -m http.server</code> as above, or use the published GitHub Pages site.</td></tr>
+        </tbody></table></div>
+
+      <footer class="site-footer" id="site-footer"></footer>
+    </main>
+    <aside class="toc" id="toc" aria-label="On this page"></aside>
+  </div>
+</div>
+<script src="assets/vendor/highlight/highlight.min.js"></script>
+<script src="assets/js/site.js"></script>
+</body>
+</html>

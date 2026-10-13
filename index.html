@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QHO541 Advanced Database Systems · Teaching notes</title>
+<meta name="description" content="Interactive teaching and learning notes for QHO541 Advanced Database Systems: SQLite, Python and Tkinter, built around a continuous Online Shop case study.">
+<script>(function(){var p="auto";try{p=localStorage.getItem("qho541.theme")||"auto"}catch(e){}var d=p==="dark"||(p==="auto"&&window.matchMedia&&matchMedia("(prefers-color-scheme: dark)").matches);document.documentElement.setAttribute("data-theme",d?"dark":"light")})();</script>
+<link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/css/site.css">
+</head>
+<body data-root="" data-page="home">
+<a class="skip-link" href="#content">Skip to content</a>
+<header class="site-header" id="site-header"></header>
+<div class="layout">
+  <nav class="sidebar" id="sidebar" aria-label="Course navigation"></nav>
+  <div class="scrim"></div>
+  <div class="main">
+    <main class="content" id="content">
+
+      <div class="hero">
+        <div class="eyebrow">Level 5 · 12-week module</div>
+        <h1>QHO541 Advanced Database Systems</h1>
+        <p class="lede">Design, build and secure a complete database application: a normalised SQLite database with triggers, views and functions, driven by a Python Tkinter interface with validation, encryption, XML backup, images and data visualisation.</p>
+        <ul class="meta-row">
+          <li class="chip">SQLite</li><li class="chip">Python 3</li><li class="chip">Tkinter</li><li class="chip">XML</li>
+          <li class="chip assess">Assessment: project + 2,000-word report</li>
+        </ul>
+      </div>
+
+      <div class="grid">
+        <a class="card" href="setup.html"><div class="kicker">Start here</div><h3>Setup &amp; tools</h3><p class="muted">Install Python, check Tkinter and SQLite, get DB Browser for SQLite and run the examples on Windows.</p></a>
+        <a class="card" href="weeks/week01.html"><div class="kicker">Weeks 1–2 · ready</div><h3>Normalisation &amp; ER diagrams</h3><p class="muted">From a messy spreadsheet to a 3NF database, drawn in Crow’s Foot and Chen notation.</p></a>
+        <a class="card" href="assessment.html"><div class="kicker">October 2026 brief</div><h3>Assessment guide</h3><p class="muted">Official structure, marks, deadlines and an evidence checklist, mapped to the weekly topics.</p></a>
+      </div>
+
+      <h2 id="case-study">One case study, all semester</h2>
+      <p>Every week builds on the same <strong>Online Shop</strong> database: customers, products, suppliers, orders, order items and inventory. You start with the normalised design in Week 1 and keep adding to it, so by Week 12 you have seen every technique the assessment asks for working together in one system. Your own assessed project uses a business scenario <em>you</em> choose; the Online Shop is the worked example you learn from.</p>
+      <figure>
+        <div class="diagram">
+          <svg viewBox="0 0 900 190" role="img" aria-labelledby="cs-t cs-d">
+            <title id="cs-t">How the Online Shop grows across the module</title>
+            <desc id="cs-d">Four stages: database design (weeks 1 to 3), application (weeks 4 and 5), security and data (weeks 6 to 10), and integration (weeks 11 and 12).</desc>
+            <defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" fill="var(--text-faint)"/></marker></defs>
+            <g font-size="13">
+              <rect x="10" y="30" width="195" height="130" rx="10" fill="var(--c-concept-bg)" stroke="var(--c-concept)"/>
+              <text x="107" y="56" text-anchor="middle" font-weight="700" fill="var(--c-concept)">Weeks 1–3 · Database</text>
+              <text x="107" y="82" text-anchor="middle">3NF schema &amp; ERD</text>
+              <text x="107" y="104" text-anchor="middle">Triggers</text>
+              <text x="107" y="126" text-anchor="middle">Views, functions,</text>
+              <text x="107" y="144" text-anchor="middle">optimised queries</text>
+              <rect x="235" y="30" width="195" height="130" rx="10" fill="var(--c-seminar-bg)" stroke="var(--c-seminar)"/>
+              <text x="332" y="56" text-anchor="middle" font-weight="700" fill="var(--c-seminar)">Weeks 4–5 · Application</text>
+              <text x="332" y="82" text-anchor="middle">Python + sqlite3</text>
+              <text x="332" y="104" text-anchor="middle">Tkinter CRUD screens</text>
+              <text x="332" y="126" text-anchor="middle">Object-oriented</text>
+              <text x="332" y="144" text-anchor="middle">GUI design</text>
+              <rect x="460" y="30" width="195" height="130" rx="10" fill="var(--c-task-bg)" stroke="var(--c-task)"/>
+              <text x="557" y="56" text-anchor="middle" font-weight="700" fill="var(--c-task)">Weeks 6–10 · Features</text>
+              <text x="557" y="82" text-anchor="middle">Validation &amp; encryption</text>
+              <text x="557" y="104" text-anchor="middle">XML backup / recovery</text>
+              <text x="557" y="126" text-anchor="middle">Charts · BLOB images</text>
+              <text x="557" y="144" text-anchor="middle">SQL-injection defence</text>
+              <rect x="685" y="30" width="205" height="130" rx="10" fill="var(--c-assess-bg)" stroke="var(--c-assess)"/>
+              <text x="787" y="56" text-anchor="middle" font-weight="700" fill="var(--c-assess)">Weeks 11–12 · Integrate</text>
+              <text x="787" y="82" text-anchor="middle">Transactions &amp;</text>
+              <text x="787" y="104" text-anchor="middle">concurrency</text>
+              <text x="787" y="126" text-anchor="middle">Testing · demo video</text>
+              <text x="787" y="144" text-anchor="middle">Report preparation</text>
+              <path d="M207 95h24" stroke="var(--text-faint)" stroke-width="2" marker-end="url(#arr)"/><path d="M432 95h24" stroke="var(--text-faint)" stroke-width="2" marker-end="url(#arr)"/><path d="M657 95h24" stroke="var(--text-faint)" stroke-width="2" marker-end="url(#arr)"/>
+            </g>
+          </svg>
+        </div>
+        <figcaption>The Online Shop grows across the module. Each stage maps onto a part of the assessment.</figcaption>
+      </figure>
+
+      <h2 id="schedule">Weekly schedule</h2>
+      <p>Each lesson has a <strong>Lecture</strong> tab (concepts, diagrams, worked examples), a <strong>Seminar</strong> tab (guided and independent practice), a <strong>Self-check</strong> quiz and a <strong>Resources</strong> tab with downloadable files. Weeks marked “In preparation” are being written and will appear here when complete.</p>
+      <ul class="schedule">
+        <li><span class="wk">1</span><a href="weeks/week01.html"><div class="ttl">Normalisation and ER diagrams</div><div class="sub">Data vs information · relational vs NoSQL · keys · anomalies · 1NF→3NF · Crow’s Foot &amp; Chen · SQLite schema</div></a><span class="chip ok">Ready</span></li>
+        <li><span class="wk">2</span><a href="weeks/week02.html"><div class="ttl">Database triggers</div><div class="sub">BEFORE/AFTER/INSTEAD OF × INSERT/UPDATE/DELETE · OLD and NEW · WHEN and RAISE · stock control · audit logging</div></a><span class="chip ok">Ready</span></li>
+        <li><span class="wk">3</span><div><div class="ttl">Views, functions and query optimisation</div><div class="sub">Views · built-in SQLite functions · JOIN, GROUP BY/HAVING · EXPLAIN QUERY PLAN · indexes</div></div><span class="chip pending">In preparation</span></li>
+        <li><span class="wk">4</span><div><div class="ttl">Python, SQLite, Tkinter and CRUD</div><div class="sub">sqlite3 module · parameterised queries · widgets, layout and events · insert/update/delete screens</div></div><span class="chip pending">In preparation</span></li>
+        <li><span class="wk">5</span><div><div class="ttl">Object-oriented GUI application design</div><div class="sub">Classes and windows · Toplevel · sharing data between classes · structuring a multi-screen app</div></div><span class="chip pending">In preparation</span></li>
+        <li><span class="wk">6</span><div><div class="ttl">Validation, cryptography and database security</div><div class="sub">Validation vs verification · hashing passwords · reversible encryption (Fernet)</div></div><span class="chip pending">In preparation</span></li>
+        <li><span class="wk">7</span><div><div class="ttl">XML and database integration</div><div class="sub">ElementTree · export SQLite to XML · recover from XML · XML as a document store</div></div><span class="chip pending">In preparation</span></li>
+        <li><span class="wk">8</span><div><div class="ttl">Data visualisation</div><div class="sub">Canvas bar/column/pie charts · matplotlib in Tkinter · reporting from SQL</div></div><span class="chip pending">In preparation</span></li>
+        <li><span class="wk">9</span><div><div class="ttl">BLOBs and multimedia</div><div class="sub">Storing and retrieving images and audio · displaying images from the database</div></div><span class="chip pending">In preparation</span></li>
+        <li><span class="wk">10</span><div><div class="ttl">SQL injection and secure programming</div><div class="sub">How injection works · UNION attacks · parameterised queries · input checking</div></div><span class="chip pending">In preparation</span></li>
+        <li><span class="wk">11</span><div><div class="ttl">Concurrency, transactions and testing</div><div class="sub">Transactions and locking · threads and SQLite · test plans · pytest</div></div><span class="chip pending">In preparation</span></li>
+        <li><span class="wk">12</span><div><div class="ttl">System integration and assessment preparation</div><div class="sub">Scenario and requirements · report structure · README · demo video · submission checklist</div></div><span class="chip pending">In preparation</span></li>
+      </ul>
+
+      <h2 id="progress">Your progress</h2>
+      <p class="muted">Saved only in this browser. Mark the lecture and seminar as complete at the end of each tab, and score 70% or more on the quiz to complete a week.</p>
+      <div class="progress-overview" id="progress-overview"></div>
+
+      <h2 id="how-to-use">How to use these notes</h2>
+      <div class="grid two">
+        <div class="card"><h3>In class</h3><ul>
+          <li>Press <kbd>P</kbd> (or the <em>Present</em> button) to show the lecture one section at a time, large enough to project. <kbd>←</kbd> <kbd>→</kbd> move between sections; <kbd>Esc</kbd> exits.</li>
+          <li>SQL playgrounds run real SQLite in the browser. Every playground has its own copy of the database, so <strong>Reset</strong> always restores it.</li>
+          <li>ER diagrams switch between Crow’s Foot and Chen with one click, and all diagrams on the page switch together.</li>
+        </ul></div>
+        <div class="card"><h3>On your own</h3><ul>
+          <li>Work through the Lecture tab, then attempt the Seminar tasks before opening the model answers.</li>
+          <li>Download the Python scripts and databases from each week’s Resources tab and run them on your own computer.</li>
+          <li>Use <kbd>/</kbd> to search all notes. The theme button switches between automatic, light and dark.</li>
+        </ul></div>
+      </div>
+      <h3 id="callout-key">What the coloured boxes mean</h3>
+      <div class="callout concept"><p class="callout-title">Key idea</p><p>A concept or definition you need to understand and be able to explain.</p></div>
+      <div class="callout task"><p class="callout-title">Try it / live coding</p><p>Something to do now: run a query, edit code or answer a question.</p></div>
+      <div class="callout seminar"><p class="callout-title">Seminar activity</p><p>Guided practice, usually in pairs or small groups.</p></div>
+      <div class="callout assess"><p class="callout-title">Official assessment requirement</p><p>Taken from the October 2026 assessment brief. This is what is marked.</p></div>
+      <div class="callout rec"><p class="callout-title">Teaching recommendation</p><p>Advice from the teaching team to help you do well. It is not an extra requirement.</p></div>
+      <div class="callout warn"><p class="callout-title">Common mistake</p><p>Errors students often make, and how to fix them.</p></div>
+
+      <h2 id="integrity">Academic integrity and AI</h2>
+      <div class="callout assess"><p class="callout-title">From the assessment brief</p><p>Generative AI is <strong>not permitted</strong> for any part of this assessment, neither the report nor the code (database and GUI), including tools such as ChatGPT and GitHub Copilot. You may use AI and other tools <strong>for learning purposes only</strong>.</p></div>
+      <p>The examples on this site are general teaching examples built on the Online Shop. Use them to learn the techniques, then design and write your own system for your own scenario. Do not copy them into your submission.</p>
+
+      <footer class="site-footer" id="site-footer"></footer>
+    </main>
+    <aside class="toc" id="toc" aria-label="On this page"></aside>
+  </div>
+</div>
+<script src="assets/js/site.js"></script>
+</body>
+</html>

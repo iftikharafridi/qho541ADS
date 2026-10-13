@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Assessment guide · QHO541</title>
+<meta name="description" content="QHO541 Advanced Database Systems assessment guide: official structure, marks, submission requirements, topic mapping, testing guidance and evidence checklist (October 2026 brief).">
+<script>(function(){var p="auto";try{p=localStorage.getItem("qho541.theme")||"auto"}catch(e){}var d=p==="dark"||(p==="auto"&&window.matchMedia&&matchMedia("(prefers-color-scheme: dark)").matches);document.documentElement.setAttribute("data-theme",d?"dark":"light")})();</script>
+<link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/css/site.css">
+</head>
+<body data-root="" data-page="assessment">
+<a class="skip-link" href="#content">Skip to content</a>
+<header class="site-header" id="site-header"></header>
+<div class="layout">
+  <nav class="sidebar" id="sidebar" aria-label="Course navigation"></nav>
+  <div class="scrim"></div>
+  <div class="main">
+    <main class="content" id="content">
+      <div class="breadcrumb"><a href="index.html">Home</a> / Assessment guide</div>
+      <div class="hero">
+        <div class="eyebrow">Assessment 1 · Project with report · 100%</div>
+        <h1>Assessment guide</h1>
+        <p class="lede">A structured summary of the <strong>October 2026 assessment brief</strong>, which is the authoritative source. If anything here differs from the brief published on SOL, the brief wins.</p>
+        <ul class="meta-row"><li><span class="tag-official">Official</span> = stated in the brief</li><li><span class="tag-rec">Recommended</span> = teaching-team advice, not marked as a separate requirement</li></ul>
+      </div>
+
+      <h2 id="key-facts">Key facts</h2>
+      <div class="table-wrap"><table>
+        <tbody>
+          <tr><th scope="row">Module</th><td>QHO541 Advanced Database Systems · Level 5</td></tr>
+          <tr><th scope="row">Assessment</th><td>Assessment 1: Project with report · individual · <strong>100%</strong> of the module · must-pass element: <strong>yes</strong></td></tr>
+          <tr><th scope="row">Issue date</th><td>Wednesday 21 October 2026</td></tr>
+          <tr><th scope="row">Hand-in</th><td><strong>Before 4pm, Friday 29 January 2027</strong>, online on the module’s SOL page</td></tr>
+          <tr><th scope="row">Planned feedback</th><td>4pm, Friday 26 February 2027</td></tr>
+          <tr><th scope="row">Word count</th><td>2,000 words ±10% (1,800–2,200). SQLite and other code is <em>not</em> counted. Words above 2,200 are not marked.</td></tr>
+          <tr><th scope="row">Formatting</th><td>Font size 12, line spacing 1.15. Title page, contents page, page numbers.</td></tr>
+          <tr><th scope="row">Marking</th><td>Anonymous. Only <strong>final</strong> submissions are marked; drafts do not count as an attempt.</td></tr>
+          <tr><th scope="row">Generative AI</th><td><strong>Not permitted</strong> for any task (report or code), including ChatGPT and GitHub Copilot. AI may be used for learning purposes only.</td></tr>
+        </tbody></table></div>
+
+      <h2 id="task">The task</h2>
+      <div class="callout assess"><p class="callout-title">Official task (summarised from the brief)</p>
+        <p>Working as a Database Analyst/Developer, design and implement a database system for a company of your choice (for example a bank, restaurant, online shop, hospital, clothing store or mobile service provider) to keep track of customer, inventory, employee and accounting information. Outline the scenario and client requirements; create a SQLite database to cover the ERD; build an XML database and a Python Tkinter application; and include tests.</p></div>
+      <p>The report should start with an <strong>Introduction</strong> that pulls together and summarises the whole project, including its background and what inspired it. You may use statistics to argue why the project was needed.</p>
+
+      <h2 id="structure">Official structure and marks</h2>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Requirement (from the brief)</th><th class="num">Marks</th></tr></thead>
+        <tbody>
+          <tr class="part-row"><td>Part 1: Client requirements; design and create the database using SQLite</td><td class="num marks">30%</td></tr>
+          <tr><td>Details of the chosen business case, with a <strong>minimum of seven client requirements</strong></td><td class="num marks">5</td></tr>
+          <tr><td>Flat file (MS Excel) of collected business data, with a <strong>minimum of 5 existing records</strong></td><td class="num marks">5</td></tr>
+          <tr><td>ERD. The relational schema must meet <strong>3NF</strong> and you must justify this; show the development steps <strong>from 1NF to 3NF</strong> with clear explanation</td><td class="num marks">10</td></tr>
+          <tr><td>SQLite database developed from the ERD</td><td class="num marks">5</td></tr>
+          <tr><td>Tables linked with relationships and referential integrity constraints: <strong>minimum five substantial tables</strong>, <strong>each with at least 5 records</strong>. Include the code as screenshots, explain <em>which</em> referential integrity constraints you used and <em>why</em>, and include a data diagram that matches the relational schema</td><td class="num marks">5</td></tr>
+          <tr class="part-row"><td>Part 2: Database design, development and testing</td><td class="num marks">45%</td></tr>
+          <tr><td><strong>At least three different triggers</strong> (INSERT, UPDATE and DELETE), using different execution timings (<strong>BEFORE and AFTER</strong>), that implement business needs</td><td class="num marks">10</td></tr>
+          <tr><td><strong>At least two built-in SQLite functions</strong> used to process, calculate or manipulate data for business needs</td><td class="num marks">10</td></tr>
+          <tr><td><strong>At least three views</strong> (virtual tables) giving the business customised views of the data</td><td class="num marks">10</td></tr>
+          <tr><td>Queries meeting business requirements, using: JOIN across two or more tables; GROUP BY with HAVING; SQLite functions; optimised queries</td><td class="num marks">10</td></tr>
+          <tr><td>Testing and reviewing the database</td><td class="num marks">5</td></tr>
+          <tr class="part-row"><td>Part 3: Programming for databases and testing</td><td class="num marks">25%</td></tr>
+          <tr><td>A SQLite–Python Tkinter application that lets a user <strong>insert, update and delete</strong> data and <strong>create a report</strong>, with front-end/back-end communication (buttons, text boxes) covering the client requirements</td><td class="num faint">no separate marks stated</td></tr>
+          <tr><td>Validation and verification of input data; <strong>encryption and decryption</strong> of input/output data</td><td class="num marks">5</td></tr>
+          <tr><td>Storing images in the database using the <strong>BLOB</strong> data type</td><td class="num marks">5</td></tr>
+          <tr><td>An <strong>XML database</strong> with appropriate elements, using the relational database; retrieving or modifying data from the XML (for example a copy of tables used to recover the relational database)</td><td class="num marks">5</td></tr>
+          <tr><td>Testing and reviewing</td><td class="num marks">5</td></tr>
+          <tr><td><strong>Innovation</strong>: other features that improve usability (for example protection from SQL injection, data visualisation), with a paragraph on the innovation and how it benefits the system</td><td class="num marks">5</td></tr>
+        </tbody></table></div>
+
+      <h3 id="grade-bands">Grade descriptors in brief</h3>
+      <p>The brief describes five bands (0–39, 40–49, 50–59, 60–69, 70+) for each part. The main differences between bands:</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Part</th><th>60–69 (good)</th><th>70+ (excellent)</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td>Well-structured database, good specification and data model; normalised schema (2NF) with ERD.</td><td>Excellent, original, researched solution; data model normalised to <strong>3NF</strong> with ERD.</td></tr>
+          <tr><td>2</td><td>Good structure of triggers, views and functions that solve the problem and cover the requirements.</td><td>Excellent, original and researched; very well written report; all tools included.</td></tr>
+          <tr><td>3</td><td>Well-structured Python–SQLite Tkinter connection; validation and encryption; good testing plan; good XML and image storage; good-quality demo video.</td><td>Excellent validation and encryption; excellent XML and image storage (including converting images back); testing plan with suggested solutions; innovation; good-quality demo video.</td></tr>
+        </tbody></table></div>
+      <p class="small muted">Lower bands mention, among other things, saving images “but not converting back” (50–59) and poor or missing XML, image storage, encryption or testing. Read the full descriptors in the brief.</p>
+
+      <h2 id="submission">Submission requirements</h2>
+      <div class="callout assess"><p class="callout-title">Submit two files</p>
+        <ol>
+          <li><strong>The report</strong> as a single PDF: title page, contents page, page numbers, about 2,000 words, with screenshots of input/output, user interaction and evidence that the requirements are met.</li>
+          <li><strong>One ZIP file</strong> containing your Python code file(s), the SQLite database, the XML file(s), a <strong>README.md</strong> (how to run the application and the database) and a <strong>demo video of 1–2 minutes</strong>.</li>
+        </ol></div>
+      <div class="callout warn"><p class="callout-title">Demo video penalties (from the brief)</p>
+        <p>If the demo video fails to upload, your final grade is <strong>reduced by 10%</strong>. The Part 3 grade descriptors also list a <strong>7%</strong> reduction for a video uploaded without sound, and a <strong>5%</strong> reduction for a very basic video with sound. Check that your video plays, has audio and stays within 1–2 minutes <em>before</em> you submit.</p></div>
+      <div class="callout note"><p class="callout-title">Late work and extenuating circumstances (summary)</p>
+        <p>Work submitted up to 7 calendar days late is capped at 40% if it passes. Later than that it counts as a non-submission (zero). Referred work must be on time. You can self-certify for up to two assessment dates per semester for a 7-day extension; otherwise apply for extenuating circumstances with evidence. Check the full regulations linked in the brief.</p></div>
+
+      <h2 id="mapping">Where each topic is taught</h2>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Week</th><th>Topic</th><th>Assessment criteria supported</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td><a href="weeks/week01.html">Normalisation &amp; ER diagrams</a></td><td>Part 1: requirements, flat file, 1NF→3NF, ERD, SQLite database, referential integrity</td></tr>
+          <tr><td>2</td><td><a href="weeks/week02.html">Database triggers</a></td><td>Part 2: three triggers (INSERT/UPDATE/DELETE, BEFORE/AFTER)</td></tr>
+          <tr><td>3</td><td>Views, functions &amp; query optimisation</td><td>Part 2: two built-in functions, three views, queries (JOIN, GROUP BY/HAVING, functions, optimisation)</td></tr>
+          <tr><td>4</td><td>Python, SQLite, Tkinter &amp; CRUD</td><td>Part 3: Tkinter application (insert, update, delete, report)</td></tr>
+          <tr><td>5</td><td>Object-oriented GUI design</td><td>Part 3: application structure across several windows</td></tr>
+          <tr><td>6</td><td>Validation, cryptography &amp; security</td><td>Part 3: validation and verification; encryption and decryption</td></tr>
+          <tr><td>7</td><td>XML &amp; database integration</td><td>Part 3: XML database, retrieval/modification, recovery</td></tr>
+          <tr><td>8</td><td>Data visualisation</td><td>Part 3: innovation (visualisation)</td></tr>
+          <tr><td>9</td><td>BLOBs &amp; multimedia</td><td>Part 3: storing images as BLOBs and converting them back</td></tr>
+          <tr><td>10</td><td>SQL injection &amp; secure programming</td><td>Part 3: innovation (SQL-injection protection); validation</td></tr>
+          <tr><td>11</td><td>Concurrency, transactions &amp; testing</td><td>Parts 2 and 3: testing and reviewing. Concurrency is <em>taught</em> but not a separately assessed item.</td></tr>
+          <tr><td>12</td><td>System integration &amp; assessment preparation</td><td>Introduction, report structure, README.md, demo video, submission</td></tr>
+        </tbody></table></div>
+
+      <h2 id="testing">Testing guidance</h2>
+      <p><span class="tag-official">Official</span> Both Part 2 (database) and Part 3 (application) include “Testing and reviewing” (5 marks each). The 70+ descriptor asks for a testing plan <em>with suggestions of solutions</em>.</p>
+      <p><span class="tag-rec">Recommended</span> Write a test plan with <strong>at least 7 tests per part</strong> and record evidence (screenshots) for each. Use this layout:</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>No. / category</th><th>Test name</th><th>Expected result</th><th>Passed (Y/N)</th><th>Review / action taken</th></tr></thead>
+        <tbody>
+          <tr><td>1 · Functional</td><td>Insert an order for a customer who does not exist</td><td>Rejected with “FOREIGN KEY constraint failed”; no row added</td><td>Y</td><td>Foreign keys enabled on every connection</td></tr>
+          <tr><td>2 · Functional</td><td>AFTER INSERT trigger reduces stock</td><td>Stock for the product falls by the quantity ordered</td><td>N</td><td>Trigger used a fixed value; rewritten to use <code>NEW.quantity</code>; retested: passed</td></tr>
+          <tr><td>3 · Validation</td><td>Register with e-mail “abc”</td><td>Message “Enter a valid e-mail”; nothing saved</td><td>Y</td><td>—</td></tr>
+        </tbody></table></div>
+      <dl class="terms">
+        <dt>Functional</dt><dd>Does each feature meet its business requirement?</dd>
+        <dt>Integration</dt><dd>Do the GUI, the database and the XML file work together correctly?</dd>
+        <dt>Acceptance</dt><dd>Does the system satisfy the client requirements you listed in Part 1?</dd>
+        <dt>Smoke</dt><dd>Does the application start and do its basic actions without crashing?</dd>
+        <dt>Non-functional</dt><dd>How well does it work: speed, file size, usability, security?</dd>
+      </dl>
+
+      <h2 id="checklist">Evidence checklist</h2>
+      <p>Tick items off as you go. Ticks are saved in this browser only.</p>
+      <h3>Part 1</h3>
+      <ul class="checklist" data-id="assessment">
+        <li><span><span class="tag-official">Official</span> Business case described, with at least <strong>7 client requirements</strong></span></li>
+        <li><span><span class="tag-official">Official</span> Flat file in Excel with at least <strong>5 records</strong></span></li>
+        <li><span><span class="tag-official">Official</span> Normalisation steps <strong>1NF → 2NF → 3NF</strong>, each explained, with justification that the final schema is in 3NF</span></li>
+        <li><span><span class="tag-rec">Recommended</span> Functional dependencies listed and labelled (partial / transitive) at each step</span></li>
+        <li><span><span class="tag-official">Official</span> ERD covering the 3NF schema</span></li>
+        <li><span><span class="tag-official">Official</span> At least <strong>5 substantial tables</strong>, <strong>each with ≥ 5 records</strong>, linked by PK–FK relationships</span></li>
+        <li><span><span class="tag-official">Official</span> Screenshots of the CREATE TABLE code, plus an explanation of which referential integrity constraints are used and why</span></li>
+        <li><span><span class="tag-official">Official</span> Data diagram that matches the relational schema</span></li>
+      </ul>
+      <h3>Part 2</h3>
+      <ul class="checklist" data-id="assessment-p2">
+        <li><span><span class="tag-official">Official</span> ≥ 3 triggers covering INSERT, UPDATE <em>and</em> DELETE, using BEFORE <em>and</em> AFTER timing, each tied to a business need</span></li>
+        <li><span><span class="tag-official">Official</span> ≥ 2 built-in SQLite functions used for business needs</span></li>
+        <li><span><span class="tag-official">Official</span> ≥ 3 views</span></li>
+        <li><span><span class="tag-official">Official</span> Queries using a JOIN across 2+ tables, GROUP BY with HAVING, SQLite functions and optimisation</span></li>
+        <li><span><span class="tag-official">Official</span> Database testing and review</span></li>
+      </ul>
+      <h3>Part 3</h3>
+      <ul class="checklist" data-id="assessment-p3">
+        <li><span><span class="tag-official">Official</span> Tkinter GUI that inserts, updates and deletes data and produces a report</span></li>
+        <li><span><span class="tag-official">Official</span> Input validation and verification</span></li>
+        <li><span><span class="tag-official">Official</span> Encryption <em>and</em> decryption of input/output data</span></li>
+        <li><span><span class="tag-rec">Recommended</span> Show both one-way hashing (for passwords) and reversible encryption (for data you must read back), and explain why each is used</span></li>
+        <li><span><span class="tag-official">Official</span> Images stored as BLOBs <span class="tag-rec">Recommended</span> and displayed again from the database</span></li>
+        <li><span><span class="tag-official">Official</span> XML database built from the relational data, with retrieval/modification (e.g. backup and recovery)</span></li>
+        <li><span><span class="tag-official">Official</span> Application testing and review</span></li>
+        <li><span><span class="tag-official">Official</span> Innovation feature plus a paragraph on its benefit</span></li>
+      </ul>
+      <h3>Submission</h3>
+      <ul class="checklist" data-id="assessment-sub">
+        <li><span><span class="tag-official">Official</span> Report PDF: title page, contents, page numbers, 1,800–2,200 words, font size 12, line spacing 1.15</span></li>
+        <li><span><span class="tag-official">Official</span> ZIP: Python file(s), SQLite database, XML file(s), README.md</span></li>
+        <li><span><span class="tag-official">Official</span> Demo video, 1–2 minutes, with sound, uploaded successfully</span></li>
+        <li><span><span class="tag-rec">Recommended</span> Unzip your ZIP on another computer and follow your own README to check that it runs</span></li>
+        <li><span><span class="tag-official">Official</span> No generative AI used for the report or code</span></li>
+      </ul>
+
+      <h2 id="corrections">Corrections to earlier slides</h2>
+      <p>Some slides from earlier years disagree with the October 2026 brief. Follow the brief:</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Earlier slide said</th><th>The October 2026 brief says</th></tr></thead>
+        <tbody>
+          <tr><td>Part 2 = 35%, Part 3 = 35%</td><td>Part 1 = 30%, <strong>Part 2 = 45%</strong>, <strong>Part 3 = 25%</strong></td></tr>
+          <tr><td>Minimum 2 views, minimum 2 triggers</td><td>Minimum <strong>3 views</strong> and <strong>3 triggers</strong> (INSERT, UPDATE, DELETE; BEFORE and AFTER)</td></tr>
+          <tr><td>“Not necessary that all the tables have 5 records”</td><td>At least five substantial tables, <strong>each with a minimum of 5 records</strong></td></tr>
+          <tr><td>“Encryption <em>or</em> decryption”</td><td>Encryption <strong>and</strong> decryption of input/output data</td></tr>
+          <tr><td>Deadline 4 February 2025</td><td><strong>Before 4pm, Friday 29 January 2027</strong></td></tr>
+          <tr><td>Learning objectives citing module “COM 519”</td><td>This module is <strong>QHO541</strong></td></tr>
+        </tbody></table></div>
+
+      <h2 id="to-confirm">Points to confirm with the module leader</h2>
+      <p class="muted">These are gaps or ambiguities in the brief itself. Ask rather than guess:</p>
+      <ul>
+        <li>The brief’s <em>Learning Outcomes</em> and <em>Living CV</em> sections are blank, and it gives a font size but no font name.</li>
+        <li>The brief says “SQLite Server” and, for images, “SQL Server database”. The module uses <strong>SQLite</strong> throughout, which is serverless; read these as “SQLite database”.</li>
+        <li>The Part 3 Tkinter application criterion has no separate mark allocation; the listed Part 3 items add up to 25.</li>
+      </ul>
+
+      <footer class="site-footer" id="site-footer"></footer>
+    </main>
+    <aside class="toc" id="toc" aria-label="On this page"></aside>
+  </div>
+</div>
+<script src="assets/js/site.js"></script>
+</body>
+</html>

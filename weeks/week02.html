@@ -1,0 +1,1097 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Week 2 · Database triggers · QHO541</title>
+<meta name="description" content="QHO541 Week 2: SQLite triggers. BEFORE, AFTER and INSTEAD OF; INSERT, UPDATE and DELETE; OLD and NEW; WHEN and RAISE; audit logging, stock control and order workflow in the Online Shop database.">
+<script>(function(){var p="auto";try{p=localStorage.getItem("qho541.theme")||"auto"}catch(e){}var d=p==="dark"||(p==="auto"&&window.matchMedia&&matchMedia("(prefers-color-scheme: dark)").matches);document.documentElement.setAttribute("data-theme",d?"dark":"light")})();</script>
+<link rel="icon" href="../assets/img/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../assets/vendor/codemirror/codemirror.css">
+<link rel="stylesheet" href="../assets/css/site.css">
+</head>
+<body data-root="../" data-page="week02">
+<a class="skip-link" href="#content">Skip to content</a>
+<header class="site-header" id="site-header"></header>
+<div class="layout">
+  <nav class="sidebar" id="sidebar" aria-label="Course navigation"></nav>
+  <div class="scrim"></div>
+  <div class="main">
+    <main class="content" id="content">
+      <div class="breadcrumb"><a href="../index.html">Home</a> / Week 2</div>
+      <div class="hero">
+        <div class="eyebrow">Week 2 · Database programming</div>
+        <h1>Database triggers</h1>
+        <p class="lede">Make the database enforce the shop’s business rules by itself: reduce stock when an item is sold, refuse orders that cannot be fulfilled, lock orders once they ship, and keep an audit trail of every important change.</p>
+        <ul class="meta-row">
+          <li class="chip">Lecture ≈ 2 hours</li><li class="chip">Seminar ≈ 2 hours</li>
+          <li class="chip assess">Assessment: Part 2, triggers (10 marks)</li><li class="chip">Database: shop_v2</li>
+        </ul>
+      </div>
+
+      <div class="tabs" role="tablist" aria-label="Lesson sections">
+        <button class="tab" role="tab" id="tab-lecture" aria-controls="panel-lecture" data-part="lecture"><span class="dot"></span>Lecture</button>
+        <button class="tab" role="tab" id="tab-seminar" aria-controls="panel-seminar" data-part="seminar"><span class="dot"></span>Seminar</button>
+        <button class="tab" role="tab" id="tab-selfcheck" aria-controls="panel-selfcheck" data-part="quiz"><span class="dot"></span>Self-check</button>
+        <button class="tab" role="tab" id="tab-resources" aria-controls="panel-resources">Resources</button>
+      </div>
+
+<!-- =========================================================== LECTURE -->
+      <div class="tabpanel" role="tabpanel" id="panel-lecture" aria-labelledby="tab-lecture">
+
+<section class="lsec">
+  <h2 id="overview">This week at a glance</h2>
+  <h3 id="outcomes">Learning outcomes</h3>
+  <p>By the end of this week you should be able to:</p>
+  <ol>
+    <li>Explain what a trigger is, using the <strong>event → condition → action</strong> model, and judge when a trigger is the right tool.</li>
+    <li>Write SQLite triggers for <strong>INSERT</strong>, <strong>UPDATE</strong> and <strong>DELETE</strong> events with <strong>BEFORE</strong>, <strong>AFTER</strong> and <strong>INSTEAD OF</strong> timing.</li>
+    <li>Use <strong>OLD</strong> and <strong>NEW</strong> correctly for each event, and restrict triggers with <strong>UPDATE OF</strong> and <strong>WHEN</strong>.</li>
+    <li>Validate data with <strong>RAISE()</strong>, and explain the difference between ABORT, FAIL, ROLLBACK and IGNORE.</li>
+    <li>Design <strong>audit logging</strong> and <strong>stock-control</strong> triggers for the Online Shop.</li>
+    <li>Trace the execution of a statement that fires several triggers, including <strong>cascading</strong> triggers.</li>
+    <li>Explain how SQLite triggers differ from those in MySQL, PostgreSQL, SQL Server and Oracle.</li>
+    <li>Debug triggers and handle the errors they raise from Python.</li>
+  </ol>
+  <h3 id="motivation">Why this matters</h3>
+  <p>Last week the Online Shop database learned to reject <em>impossible</em> data: an order for a customer who does not exist, a negative price. It still accepts plenty of data that is possible but <em>wrong for the business</em>. A customer can order 10 cheddars when 4 are in stock. A delivered order can be quietly edited. Stock levels drift away from what was actually sold. Nobody can say who changed a price, or when.</p>
+  <p>Real systems handle these rules with <strong>triggers</strong>: small programs stored <em>inside</em> the database that run automatically whenever data changes. Because they live in the database, they apply to every program that touches the data: the Tkinter app you build in Week 4, an import script, or someone typing SQL into DB Browser.</p>
+  <div class="grid">
+    <div class="card"><div class="kicker">Retail</div><p>Reserve stock as items go into an order; raise a reorder alert when stock runs low.</p></div>
+    <div class="card"><div class="kicker">Banking</div><p>Record every change to an account in an append-only audit table that regulators can inspect.</p></div>
+    <div class="card"><div class="kicker">Healthcare</div><p>Log every access to or change of a patient record, as data-protection law requires.</p></div>
+    <div class="card"><div class="kicker">Workflow</div><p>Stop an invoice that has been paid from being edited, or an order from moving backwards through its stages.</p></div>
+  </div>
+  <div class="callout assess"><p class="callout-title">Assessment connection: Part 2, triggers (10 marks)</p>
+    <p>The brief asks for a <strong>minimum of three different triggers</strong> covering <strong>INSERT, UPDATE and DELETE</strong>, using different execution timings (<strong>BEFORE and AFTER</strong>), that implement business needs. See the <a href="../assessment.html#structure">assessment guide</a>.</p></div>
+  <div class="callout rec"><p class="callout-title">Teaching recommendation</p><p>Tie every trigger in your project to one of your written client requirements, and show it working in your test plan with a <em>before</em> and <em>after</em> screenshot, including one test where the trigger correctly <em>refuses</em> bad data.</p></div>
+  <h3 id="prerequisites">Before you start</h3>
+  <p>You need the Week 1 schema (customer, product, inventory, orders, order_item…), and to be comfortable with <code>UPDATE … SET … WHERE</code> and with a <em>subquery</em> that returns one value, such as <code>(SELECT qty_in_stock FROM inventory WHERE product_id = 9)</code>.</p>
+</section>
+
+<section class="lsec">
+  <h2 id="what-is-a-trigger">What is a trigger?</h2>
+  <p>A <strong>trigger</strong> is a named block of SQL that the database runs automatically when a specified change happens to a specified table. You never call a trigger yourself: the database <em>fires</em> it. Every trigger follows the <strong>event → condition → action</strong> (ECA) pattern:</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Part</th><th>Question it answers</th><th>Online Shop example</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Event</strong></td><td>Which change on which table?</td><td><code>INSERT ON order_item</code></td></tr>
+      <tr><td><strong>Timing</strong></td><td>Before or after the row is changed (or instead of it)?</td><td><code>AFTER</code></td></tr>
+      <tr><td><strong>Condition</strong> (optional)</td><td>Should it run for <em>this</em> row?</td><td><code>WHEN NEW.quantity &gt; 0</code></td></tr>
+      <tr><td><strong>Action</strong></td><td>What SQL runs?</td><td><code>UPDATE inventory SET qty_in_stock = qty_in_stock - NEW.quantity …</code></td></tr>
+    </tbody></table></div>
+  <div class="two-col">
+    <div class="card"><h4>Benefits</h4><ul>
+      <li><strong>Rules live in one place.</strong> Every program that changes the data obeys them; you do not re-code them in each application.</li>
+      <li><strong>Easier maintenance.</strong> Change the rule once, in the database.</li>
+      <li><strong>Consistency.</strong> Related changes (sale and stock, change and audit row) happen in the same transaction: both or neither.</li>
+      <li><strong>Performance in client–server systems.</strong> The work happens next to the data, with no extra network round trips.</li>
+    </ul></div>
+    <div class="card"><h4>Drawbacks</h4><ul>
+      <li><strong>Hidden behaviour.</strong> A simple INSERT may change five tables, which surprises anyone who does not know the triggers exist.</li>
+      <li><strong>Harder to debug</strong>, because they run automatically and invisibly.</li>
+      <li><strong>Performance cost</strong> on every affected row, especially with cascades.</li>
+      <li><strong>Logic split</strong> between application and database if used carelessly.</li>
+    </ul></div>
+  </div>
+  <div class="callout concept"><p class="callout-title">Trigger or application code?</p><p>Use a trigger for rules that must hold <strong>no matter who changes the data</strong> (stock must match sales; audits must not be skipped). Keep presentation and user-interaction logic (messages, screens, workflows involving a person) in the application. Use a simple <code>CHECK</code> constraint instead of a trigger when the rule only involves the row itself (<code>price &gt;= 0</code>).</p></div>
+</section>
+
+<section class="lsec">
+  <h2 id="syntax">Trigger syntax in SQLite</h2>
+  <pre><code class="language-sql" data-file="General form">
+CREATE [TEMP] TRIGGER [IF NOT EXISTS] trigger_name
+    { BEFORE | AFTER | INSTEAD OF }
+    { INSERT | UPDATE [OF column, …] | DELETE }
+    ON table_or_view_name
+    [FOR EACH ROW]
+    [WHEN condition]
+BEGIN
+    statement;          -- INSERT, UPDATE, DELETE or SELECT
+    statement;          -- as many as you need, each ending with ;
+END;
+</code></pre>
+  <dl class="terms">
+    <dt>trigger_name</dt><dd>Must be unique in the database. A naming convention such as <code>trg_table_purpose</code> makes triggers easy to find.</dd>
+    <dt>BEFORE / AFTER</dt><dd>Whether the action runs before or after the row is changed. On <strong>tables</strong> only.</dd>
+    <dt>INSTEAD OF</dt><dd>Replaces the change entirely. On <strong>views</strong> only (see below).</dd>
+    <dt>UPDATE OF col, …</dt><dd>Fire only when one of these columns appears in the <code>SET</code> list of the UPDATE.</dd>
+    <dt>FOR EACH ROW</dt><dd>The trigger runs once per affected row. SQLite only supports row-level triggers, so this clause is optional and implied.</dd>
+    <dt>WHEN</dt><dd>A condition checked for each row; if it is false (or NULL) the body is skipped for that row.</dd>
+    <dt>BEGIN … END</dt><dd>The body: one or more SQL statements. There are no variables, IF statements or loops; use <code>WHEN</code>, <code>CASE</code> and subqueries instead.</dd>
+  </dl>
+  <h3 id="managing">Managing triggers</h3>
+  <pre><code class="language-sql" data-test="shop_v2">
+-- List every trigger, with the table it belongs to
+SELECT name, tbl_name FROM sqlite_master WHERE type = 'trigger' ORDER BY tbl_name, name;
+
+-- Show the full definition of one trigger
+SELECT sql FROM sqlite_master WHERE type = 'trigger' AND name = 'trg_order_item_sale';
+</code></pre>
+  <p>There is no <code>ALTER TRIGGER</code> in SQLite: to change a trigger, <code>DROP TRIGGER IF EXISTS name;</code> and create it again. Dropping a table also drops its triggers. In DB Browser for SQLite, triggers appear under <em>Database Structure → Triggers</em>.</p>
+</section>
+
+<section class="lsec">
+  <h2 id="old-new">OLD and NEW</h2>
+  <p>Inside a trigger, <code>NEW</code> and <code>OLD</code> refer to the row being changed. Which ones exist depends on the event:</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Event</th><th><code>OLD.column</code></th><th><code>NEW.column</code></th><th>Typical use</th></tr></thead>
+    <tbody>
+      <tr><td>INSERT</td><td>✗ (no old row)</td><td>✓ the row being added</td><td>Check or react to the new data</td></tr>
+      <tr><td>UPDATE</td><td>✓ values before the change</td><td>✓ values after the change</td><td>Compare: what changed, by how much?</td></tr>
+      <tr><td>DELETE</td><td>✓ the row being removed</td><td>✗ (no new row)</td><td>Undo its effects; archive it</td></tr>
+    </tbody></table></div>
+  <div class="callout warn"><p class="callout-title">A mistake SQLite does not catch until it runs</p><p>A trigger that uses <code>NEW</code> in a DELETE trigger (or <code>OLD</code> in an INSERT trigger) is <strong>created without any error</strong>. It only fails when it fires, with <code>no such column: NEW.quantity</code>. Always test every trigger by actually firing it.</p></div>
+  <h3 id="first-trigger">Your first trigger: logging new customers</h3>
+  <p>The original Week 2 example logged every new employee into <code>emp_log</code>. Here is the same idea for the shop: whenever a customer registers, an <code>AFTER INSERT</code> trigger writes a row to a log table using <code>NEW</code>. Run it, then change the INSERT and run it again.</p>
+  <div class="playground" data-db="shop_v1" data-title="Live coding 1: AFTER INSERT with NEW">
+<script type="text/plain" class="pg-sql">
+CREATE TABLE customer_log (
+    customer_id INTEGER,
+    email       TEXT,
+    logged_at   TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TRIGGER trg_customer_log
+AFTER INSERT ON customer
+FOR EACH ROW
+BEGIN
+    INSERT INTO customer_log (customer_id, email)
+    VALUES (NEW.customer_id, NEW.email);
+END;
+
+-- Fire it: the trigger runs automatically
+INSERT INTO customer (first_name, last_name, email, address_line, postcode)
+VALUES ('Lena', 'Novak', 'lena.novak@example.com', '5 Dock Road, Southampton', 'SO14 3AB');
+
+SELECT * FROM customer_log;
+</script>
+  </div>
+  <p class="small muted"><code>NEW.customer_id</code> already holds the id SQLite generated, because an AFTER trigger runs once the row exists.</p>
+</section>
+
+<section class="lsec">
+  <h2 id="timing">BEFORE, AFTER and INSTEAD OF: the execution flow</h2>
+  <p>What exactly happens when one statement fires triggers? For <strong>each row</strong> the statement touches, SQLite runs the steps below in order. This flow is the most useful thing to understand when a trigger does something unexpected.</p>
+  <figure>
+    <div class="diagram">
+      <svg viewBox="0 0 860 560" role="img" aria-labelledby="flow-t flow-d">
+        <title id="flow-t">How SQLite runs a statement that fires triggers</title>
+        <desc id="flow-d">For each affected row: BEFORE triggers, then constraint checks and the row change, then AFTER triggers, which may fire further triggers. At the end of the statement foreign keys are checked. A RAISE or a constraint failure at any step undoes the statement.</desc>
+        <defs><marker id="fa" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" fill="var(--text-soft)"/></marker>
+              <marker id="fr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" fill="var(--c-warn)"/></marker></defs>
+        <g font-size="13.5">
+          <rect x="150" y="10" width="330" height="46" rx="8" fill="var(--bg-sunk)" stroke="var(--border-strong)"/>
+          <text x="315" y="38" text-anchor="middle" font-weight="700">INSERT / UPDATE / DELETE statement</text>
+          <rect x="60" y="80" width="510" height="330" rx="12" fill="none" stroke="var(--border-strong)" stroke-dasharray="6 5"/>
+          <text x="78" y="102" font-weight="700" fill="var(--text-soft)">for EACH affected row</text>
+          <rect x="150" y="116" width="330" height="62" rx="8" fill="var(--c-task-bg)" stroke="var(--c-task)"/>
+          <text x="315" y="141" text-anchor="middle" font-weight="700" fill="var(--c-task)">① BEFORE triggers</text>
+          <text x="315" y="162" text-anchor="middle" font-size="12.5">run if their WHEN is true · use for validation</text>
+          <rect x="150" y="208" width="330" height="62" rx="8" fill="var(--c-concept-bg)" stroke="var(--c-concept)"/>
+          <text x="315" y="233" text-anchor="middle" font-weight="700" fill="var(--c-concept)">② Constraints checked, row written</text>
+          <text x="315" y="254" text-anchor="middle" font-size="12.5">NOT NULL · CHECK · UNIQUE / PRIMARY KEY</text>
+          <rect x="150" y="300" width="330" height="62" rx="8" fill="var(--c-seminar-bg)" stroke="var(--c-seminar)"/>
+          <text x="315" y="325" text-anchor="middle" font-weight="700" fill="var(--c-seminar)">③ AFTER triggers</text>
+          <text x="315" y="346" text-anchor="middle" font-size="12.5">run if their WHEN is true · use for consequences</text>
+          <rect x="150" y="436" width="330" height="46" rx="8" fill="var(--bg-sunk)" stroke="var(--border-strong)"/>
+          <text x="315" y="464" text-anchor="middle" font-weight="700">④ End of statement: foreign keys checked</text>
+          <rect x="150" y="504" width="330" height="46" rx="8" fill="var(--bg-elev)" stroke="var(--ok)"/>
+          <text x="315" y="532" text-anchor="middle" font-weight="700" fill="var(--ok)">⑤ All changes kept (until COMMIT)</text>
+          <path d="M315 56v56" stroke="var(--text-soft)" stroke-width="2" fill="none" marker-end="url(#fa)"/><path d="M315 178v26" stroke="var(--text-soft)" stroke-width="2" fill="none" marker-end="url(#fa)"/><path d="M315 270v26" stroke="var(--text-soft)" stroke-width="2" fill="none" marker-end="url(#fa)"/><path d="M315 362v70" stroke="var(--text-soft)" stroke-width="2" fill="none" marker-end="url(#fa)"/><path d="M315 482v18" stroke="var(--text-soft)" stroke-width="2" fill="none" marker-end="url(#fa)"/>
+          <path d="M480 331h40v-200h-36" stroke="var(--text-soft)" stroke-width="1.6" fill="none" stroke-dasharray="4 3" marker-end="url(#fa)"/>
+          <text x="528" y="226" font-size="12" fill="var(--text-soft)" transform="rotate(90 528 226)" text-anchor="middle">next row</text>
+          <!-- cascade -->
+          <rect x="620" y="296" width="230" height="78" rx="8" fill="var(--c-assess-bg)" stroke="var(--c-assess)"/>
+          <text x="735" y="325" text-anchor="middle" font-weight="700" fill="var(--c-assess)">Cascading triggers</text>
+          <text x="735" y="346" text-anchor="middle" font-size="12">an AFTER trigger’s UPDATE fires</text>
+          <text x="735" y="362" text-anchor="middle" font-size="12">this same flow on another table</text>
+          <path d="M572 331h44" stroke="var(--c-assess)" stroke-width="1.8" fill="none" marker-end="url(#fa)"/>
+          <!-- error -->
+          <rect x="620" y="150" width="230" height="86" rx="8" fill="var(--c-warn-bg)" stroke="var(--c-warn)"/>
+          <text x="735" y="175" text-anchor="middle" font-weight="700" fill="var(--c-warn)">RAISE(ABORT) or a</text>
+          <text x="735" y="194" text-anchor="middle" font-weight="700" fill="var(--c-warn)">constraint failure</text>
+          <text x="735" y="216" text-anchor="middle" font-size="12">undo this statement’s changes,</text>
+          <text x="735" y="232" text-anchor="middle" font-size="12" dy="-2">return an error</text>
+          <path d="M480 147h60l74 30" stroke="var(--c-warn)" stroke-width="1.6" fill="none" marker-end="url(#fr)"/>
+          <path d="M480 239h134" stroke="var(--c-warn)" stroke-width="1.6" fill="none" marker-end="url(#fr)"/>
+        </g>
+      </svg>
+    </div>
+    <figcaption>The life of a statement. A RAISE in step ① stops the row before it is written. An error anywhere undoes <em>every</em> change the statement made, including changes made by triggers.</figcaption>
+  </figure>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Timing</th><th>Runs</th><th>Use it to…</th><th>Online Shop example</th></tr></thead>
+    <tbody>
+      <tr><td><strong>BEFORE</strong></td><td>before constraints are checked and the row is written</td><td>validate, and refuse bad changes with RAISE</td><td>refuse an order line when stock is too low</td></tr>
+      <tr><td><strong>AFTER</strong></td><td>after the row has been written</td><td>change <em>other</em> tables as a consequence; write logs</td><td>reduce stock; record a stock movement</td></tr>
+      <tr><td><strong>INSTEAD OF</strong></td><td>in place of the change (views only)</td><td>make a view behave as if it were updatable</td><td>insert an order line by product <em>name</em></td></tr>
+    </tbody></table></div>
+  <div class="callout warn"><p class="callout-title">SQLite-specific: BEFORE triggers cannot change the row</p><p>In MySQL or PostgreSQL a BEFORE trigger often fixes the incoming row (<code>SET NEW.price = …</code>). <strong>SQLite does not allow assignment to NEW.</strong> A BEFORE trigger can only <em>check</em> and <em>refuse</em>. To fill in a value, use an AFTER trigger that UPDATEs the new row, a column <code>DEFAULT</code>, or an INSTEAD OF trigger on a view. The SQLite documentation also warns against a BEFORE UPDATE or DELETE trigger changing the very row being updated or deleted: the result is undefined, so use AFTER.</p></div>
+</section>
+
+<section class="lsec">
+  <h2 id="stock-trigger">Building the stock trigger step by step</h2>
+  <p>This is the problem from the original Week 2 lecture, rebuilt on our schema. All the playgrounds below use <code>shop_v1</code>, which has <strong>no triggers yet</strong>.</p>
+  <h3 id="step1">Step 1: the problem</h3>
+  <p>Adding 5 × Basmati Rice to an order should reduce the stock of rice from 70 to 65. Does it?</p>
+  <div class="playground" data-db="shop_v1" data-title="Step 1: no trigger, so stock is wrong">
+<script type="text/plain" class="pg-sql">
+SELECT product_id, qty_in_stock FROM inventory WHERE product_id = 9;   -- before: 70
+
+INSERT INTO order_item (order_id, product_id, quantity, unit_price)
+VALUES (1009, 9, 5, 2.10);
+
+SELECT product_id, qty_in_stock FROM inventory WHERE product_id = 9;   -- still 70!
+</script>
+  </div>
+  <h3 id="step2">Step 2: a first attempt, and why it is wrong</h3>
+  <p>The original slides’ first attempt set the stock to a fixed number. It changes the data, but it is wrong for every order except one:</p>
+  <div class="playground" data-db="shop_v1" data-title="Step 2: a fixed value (wrong)">
+<script type="text/plain" class="pg-sql">
+CREATE TRIGGER trg_stock_wrong
+AFTER INSERT ON order_item
+BEGIN
+    UPDATE inventory SET qty_in_stock = 99      -- always 99, always product 9!
+    WHERE product_id = 9;
+END;
+
+INSERT INTO order_item VALUES (1009, 9, 5, 2.10);
+INSERT INTO order_item VALUES (1009, 1, 3, 0.85);  -- a cola order also sets RICE to 99
+
+SELECT product_id, qty_in_stock FROM inventory WHERE product_id IN (1, 9);
+</script>
+  </div>
+  <h3 id="step3">Step 3: use NEW</h3>
+  <p><code>NEW</code> holds the row just inserted, so the trigger can use <em>its</em> quantity and <em>its</em> product:</p>
+  <div class="playground" data-db="shop_v1" data-title="Step 3: correct AFTER INSERT trigger">
+<script type="text/plain" class="pg-sql">
+CREATE TRIGGER trg_reduce_stock
+AFTER INSERT ON order_item
+FOR EACH ROW
+BEGIN
+    UPDATE inventory
+    SET    qty_in_stock = qty_in_stock - NEW.quantity
+    WHERE  product_id = NEW.product_id;
+END;
+
+INSERT INTO order_item VALUES (1009, 9, 5, 2.10);   -- rice 70 -> 65
+INSERT INTO order_item VALUES (1009, 1, 3, 0.85);   -- cola 240 -> 237
+
+SELECT product_id, qty_in_stock FROM inventory WHERE product_id IN (1, 9);
+</script>
+  </div>
+  <h3 id="step4">Step 4: what if there is not enough stock?</h3>
+  <p>Only 4 Cheddar are in stock. With the Step 3 trigger, ordering 10 would make the stock −6. Our Week 1 schema already has <code>CHECK (qty_in_stock &gt;= 0)</code>, so the AFTER trigger’s UPDATE fails and the whole INSERT is undone. That is <em>defence in depth</em>, but the error (<code>CHECK constraint failed</code>) means nothing to a shop assistant. A <strong>BEFORE</strong> trigger can refuse the order earlier, with a clear message. The original slides gave two solutions:</p>
+  <div class="two-col">
+    <div><p><strong>Solution 1: CASE inside the body</strong></p>
+    <pre><code class="language-sql" data-test="shop_v1">
+CREATE TRIGGER trg_check_stock_v1
+BEFORE INSERT ON order_item
+BEGIN
+    SELECT CASE
+        WHEN (SELECT qty_in_stock FROM inventory
+              WHERE product_id = NEW.product_id) &lt; NEW.quantity
+        THEN RAISE(ABORT, 'Not enough stock')
+    END;
+END;
+</code></pre></div>
+    <div><p><strong>Solution 2: a WHEN clause (preferred)</strong></p>
+    <pre><code class="language-sql" data-test="shop_v1">
+CREATE TRIGGER trg_check_stock_v2
+BEFORE INSERT ON order_item
+FOR EACH ROW
+WHEN NEW.quantity &gt; (SELECT qty_in_stock FROM inventory
+                     WHERE product_id = NEW.product_id)
+BEGIN
+    SELECT RAISE(ABORT, 'Not enough stock');
+END;
+</code></pre></div>
+  </div>
+  <p>Both work. Solution 2 is easier to read, because the condition is in the trigger’s header, and the body only runs when it is needed. Try it:</p>
+  <div class="playground" data-db="shop_v1" data-title="Step 4: refuse the order with a clear message" data-expect="error">
+<script type="text/plain" class="pg-sql">
+CREATE TRIGGER trg_check_stock
+BEFORE INSERT ON order_item
+FOR EACH ROW
+WHEN NEW.quantity > (SELECT qty_in_stock FROM inventory WHERE product_id = NEW.product_id)
+BEGIN
+    SELECT RAISE(ABORT, 'Not enough stock');
+END;
+
+-- 10 cheddar, but only 4 in stock: refused before the row is written
+INSERT INTO order_item VALUES (1009, 7, 10, 3.40);
+</script>
+  </div>
+  <div class="callout task"><p class="callout-title">Try it: the IIF function from the slides</p><p>Before writing a trigger you can test its condition as an ordinary query. In the playground above, replace the INSERT with <code>SELECT IIF(10 &gt; (SELECT qty_in_stock FROM inventory WHERE product_id = 7), 'Refuse', 'Accept') AS decision;</code>. <code>IIF(condition, if_true, if_false)</code> has been in SQLite since version 3.32.</p></div>
+  <div class="callout warn"><p class="callout-title">The NULL trap</p><p>If a product has <em>no</em> inventory row, the subquery returns NULL, <code>10 &gt; NULL</code> is NULL (not true), and Solution 2 lets the order through. The shop’s real trigger uses <code>COALESCE((SELECT …), 0)</code> so a missing stock record counts as zero stock.</p></div>
+</section>
+
+<section class="lsec">
+  <h2 id="when-raise">WHEN conditions and RAISE()</h2>
+  <h3 id="when">Writing good WHEN conditions</h3>
+  <ul>
+    <li><strong>Fire only on real changes.</strong> <code>UPDATE OF price</code> fires whenever <code>price</code> appears in the SET list, <em>even if the value is the same</em>. Add <code>WHEN NEW.price &lt;&gt; OLD.price</code>.</li>
+    <li><strong>Compare NULL-safely.</strong> <code>OLD.phone &lt;&gt; NEW.phone</code> is NULL when either is NULL, so a change to or from NULL would be missed. Use <code>OLD.phone IS NOT NEW.phone</code>.</li>
+    <li><strong>Detect crossings, not states.</strong> A reorder alert should be raised when stock <em>falls to</em> the reorder level, not on every later sale: <code>WHEN NEW.qty_in_stock &lt;= NEW.reorder_level AND OLD.qty_in_stock &gt; OLD.reorder_level</code>.</li>
+  </ul>
+  <h3 id="raise">RAISE() options</h3>
+  <p><code>RAISE()</code> can only be used inside a trigger. Its message must be a plain string literal, such as <code>'Not enough stock'</code>; it cannot be built from <code>NEW</code> values in the SQLite versions used in this module.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Form</th><th>Effect</th><th>In Python</th></tr></thead>
+    <tbody>
+      <tr><td><code>RAISE(ABORT, 'msg')</code></td><td>Stops the statement and undoes <strong>all of its changes</strong>, including those made by triggers. Earlier statements in the same transaction are kept. <em>The usual choice.</em></td><td><code>sqlite3.IntegrityError: msg</code></td></tr>
+      <tr><td><code>RAISE(FAIL, 'msg')</code></td><td>Stops the statement but <strong>keeps</strong> rows it had already changed (e.g. the first rows of a multi-row INSERT).</td><td><code>IntegrityError</code></td></tr>
+      <tr><td><code>RAISE(ROLLBACK, 'msg')</code></td><td>Rolls back the <strong>whole transaction</strong>, not just this statement.</td><td><code>IntegrityError</code>, transaction ended</td></tr>
+      <tr><td><code>RAISE(IGNORE)</code></td><td>Silently skips the current row and carries on with the next; no error.</td><td>no error, row not changed</td></tr>
+    </tbody></table></div>
+  <div class="playground" data-db="shop_v1" data-title="RAISE(IGNORE) silently skips rows">
+<script type="text/plain" class="pg-sql">
+-- Quietly ignore attempts to add a customer from a blocked e-mail domain
+CREATE TRIGGER trg_block_domain
+BEFORE INSERT ON customer
+FOR EACH ROW
+WHEN NEW.email LIKE '%@spam.example'
+BEGIN
+    SELECT RAISE(IGNORE);
+END;
+
+INSERT INTO customer (first_name, last_name, email, address_line, postcode) VALUES
+    ('Real',  'Person', 'real.person@example.com', '1 High St', 'SO14 1AA'),
+    ('Spam',  'Bot',    'bot1@spam.example',       '?',         '?'),
+    ('Other', 'Person', 'other.person@example.com','2 High St', 'SO14 1AB');
+
+SELECT customer_id, first_name, email FROM customer WHERE customer_id > 8;   -- the bot is missing
+</script>
+  </div>
+</section>
+
+<section class="lsec">
+  <h2 id="shop-triggers">The Online Shop’s triggers (shop_v2)</h2>
+  <p>This week’s database, <code>shop_v2</code>, is <code>shop_v1</code> plus a migration script that adds four supporting tables, one view and <strong>18 triggers</strong>. Stock is <em>reserved</em> as soon as an item is added to an order, and handed back if the line is removed or the order cancelled.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Trigger</th><th>Timing &amp; event</th><th>Business rule</th></tr></thead>
+    <tbody>
+      <tr><td><code>trg_order_item_check_stock</code></td><td>BEFORE INSERT on order_item</td><td>Refuse an order line if there is not enough stock</td></tr>
+      <tr><td><code>trg_order_item_sale</code></td><td>AFTER INSERT on order_item</td><td>Reduce stock; log a ‘sale’ movement</td></tr>
+      <tr><td><code>trg_order_item_check_amend</code></td><td>BEFORE UPDATE OF quantity</td><td>An increase must also be in stock</td></tr>
+      <tr><td><code>trg_order_item_amend</code></td><td>AFTER UPDATE OF quantity</td><td>Adjust stock by NEW − OLD; log it</td></tr>
+      <tr><td><code>trg_order_item_removed</code></td><td>AFTER DELETE on order_item</td><td>Return the items to stock (unless the order was cancelled)</td></tr>
+      <tr><td><code>trg_order_item_no_rekey</code></td><td>BEFORE UPDATE OF order_id, product_id</td><td>A line cannot be moved to another order or product</td></tr>
+      <tr><td><code>trg_order_item_lock_insert / _update / _delete</code></td><td>BEFORE INSERT / UPDATE / DELETE</td><td>Shipped, delivered or cancelled orders cannot be edited</td></tr>
+      <tr><td><code>trg_orders_status_rules</code></td><td>BEFORE UPDATE OF status on orders</td><td>Only valid status changes are allowed (diagram below)</td></tr>
+      <tr><td><code>trg_orders_cancel_restock</code></td><td>AFTER UPDATE OF status</td><td>Cancelling returns every item to stock</td></tr>
+      <tr><td><code>trg_orders_no_delete</code></td><td>BEFORE DELETE on orders</td><td>Only Pending orders may be deleted</td></tr>
+      <tr><td><code>trg_inventory_low_stock</code></td><td>AFTER UPDATE OF qty_in_stock</td><td>Raise a reorder alert when stock falls to the reorder level</td></tr>
+      <tr><td><code>trg_inventory_alert_resolved</code></td><td>AFTER UPDATE OF qty_in_stock</td><td>Mark alerts resolved once stock is above the level again</td></tr>
+      <tr><td><code>trg_product_price_history</code></td><td>AFTER UPDATE OF price on product</td><td>Audit every real price change</td></tr>
+      <tr><td><code>trg_customer_audit_update</code></td><td>AFTER UPDATE OF email, phone, address…</td><td>Audit changes to personal details (old → new)</td></tr>
+      <tr><td><code>trg_customer_audit_delete</code></td><td>AFTER DELETE on customer</td><td>Record who was deleted</td></tr>
+      <tr><td><code>trg_v_order_lines_insert</code></td><td>INSTEAD OF INSERT on view v_order_lines</td><td>Add an order line by product name, at today’s price</td></tr>
+    </tbody></table></div>
+  <p>Between them these cover <strong>INSERT, UPDATE and DELETE</strong> with <strong>BEFORE, AFTER and INSTEAD OF</strong> timing: more than the assessment minimum, so that you can see each kind working.</p>
+  <h3 id="status-workflow">The order status workflow</h3>
+  <figure>
+    <div class="diagram">
+      <svg viewBox="0 0 860 230" role="img" aria-labelledby="sw-t">
+        <title id="sw-t">Allowed order status changes</title>
+        <defs><marker id="sa" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" fill="var(--text-soft)"/></marker></defs>
+        <g font-size="14" font-weight="700">
+          <rect x="20" y="40" width="150" height="50" rx="25" fill="var(--c-task-bg)" stroke="var(--c-task)"/><text x="95" y="70" text-anchor="middle" fill="var(--c-task)">Pending</text>
+          <rect x="240" y="40" width="150" height="50" rx="25" fill="var(--c-concept-bg)" stroke="var(--c-concept)"/><text x="315" y="70" text-anchor="middle" fill="var(--c-concept)">Paid</text>
+          <rect x="460" y="40" width="150" height="50" rx="25" fill="var(--c-concept-bg)" stroke="var(--c-concept)"/><text x="535" y="70" text-anchor="middle" fill="var(--c-concept)">Shipped</text>
+          <rect x="680" y="40" width="160" height="50" rx="25" fill="var(--c-seminar-bg)" stroke="var(--c-seminar)"/><text x="760" y="70" text-anchor="middle" fill="var(--c-seminar)">Delivered</text>
+          <rect x="130" y="160" width="150" height="50" rx="25" fill="var(--c-warn-bg)" stroke="var(--c-warn)"/><text x="205" y="190" text-anchor="middle" fill="var(--c-warn)">Cancelled</text>
+        </g>
+        <g stroke="var(--text-soft)" stroke-width="2" fill="none">
+          <path d="M172 65h64" marker-end="url(#sa)"/><path d="M392 65h64" marker-end="url(#sa)"/><path d="M612 65h64" marker-end="url(#sa)"/>
+          <path d="M95 92 L170 156" marker-end="url(#sa)"/><path d="M300 92 L240 156" marker-end="url(#sa)"/>
+        </g>
+        <g font-size="12" fill="var(--text-soft)">
+          <text x="300" y="186">trg_orders_cancel_restock returns the stock</text>
+          <text x="460" y="130">Every other change (e.g. Delivered → Pending) is refused</text>
+          <text x="460" y="148">by trg_orders_status_rules with RAISE(ABORT)</text>
+          <text x="480" y="22">order lines locked from Shipped onwards</text>
+        </g>
+      </svg>
+    </div>
+    <figcaption>Valid transitions are arrows. A BEFORE UPDATE trigger refuses everything else.</figcaption>
+  </figure>
+  <h3 id="trigger-lab">Trigger lab: watch the chain fire</h3>
+  <p>Pick a scenario and press <strong>Run statement</strong>. The statement really runs in SQLite in your browser, on a private copy of <code>shop_v2</code>. The tables on the right show the affected rows before and after, with changed cells highlighted. The list on the left explains which triggers fired, in what order, and why.</p>
+  <div class="trigger-lab" data-db="shop_v2">
+<script type="application/json">
+[
+ {"title":"A normal sale","expect":"ok",
+  "intro":"Add 2 × Basmati Rice (product 9) to order 1009, which is still <em>Pending</em>.",
+  "sql":"INSERT INTO order_item (order_id, product_id, quantity, unit_price)\nVALUES (1009, 9, 2, 2.10);",
+  "watch":[{"label":"inventory: Basmati Rice","sql":"SELECT product_id, qty_in_stock, reorder_level FROM inventory WHERE product_id = 9"},
+           {"label":"stock_movement","sql":"SELECT movement_id, product_id, qty_change, reason, order_id FROM stock_movement ORDER BY movement_id"}],
+  "steps":[{"t":"before","text":"<code>trg_order_item_lock_insert</code>: WHEN order 1009 is Shipped/Delivered/Cancelled? It is Pending, so the body is skipped."},
+           {"t":"before","text":"<code>trg_order_item_check_stock</code>: WHEN 2 &gt; 70? False, so no RAISE."},
+           {"t":"row","text":"Constraints pass (primary key, foreign keys, <code>quantity &gt; 0</code>) and the row is written to <code>order_item</code>."},
+           {"t":"after","text":"<code>trg_order_item_sale</code>: UPDATE inventory 70 → 68, then INSERT a ‘sale’ movement of −2."},
+           {"t":"cascade","text":"That UPDATE fires the inventory triggers: <code>trg_inventory_low_stock</code> (68 ≤ 20? no) and <code>trg_inventory_alert_resolved</code> (no open alerts)."},
+           {"t":"end","text":"One INSERT changed three tables, all in one statement: either all of it happens, or none of it."}]},
+ {"title":"A sale that triggers a reorder alert (cascade)","expect":"ok",
+  "intro":"Add 16 × Orange Juice (product 3) to order 1008. Stock is 35 and the reorder level is 20.",
+  "sql":"INSERT INTO order_item (order_id, product_id, quantity, unit_price)\nVALUES (1008, 3, 16, 1.75);",
+  "watch":[{"label":"inventory: Orange Juice","sql":"SELECT product_id, qty_in_stock, reorder_level FROM inventory WHERE product_id = 3"},
+           {"label":"reorder_alert","sql":"SELECT alert_id, product_id, qty_in_stock, reorder_level, resolved FROM reorder_alert ORDER BY alert_id"}],
+  "steps":[{"t":"before","text":"Lock and stock checks pass (order 1008 is Paid; 16 ≤ 35)."},
+           {"t":"row","text":"The order line is written."},
+           {"t":"after","text":"<code>trg_order_item_sale</code> reduces stock 35 → 19 and logs the movement."},
+           {"t":"cascade","text":"The inventory UPDATE fires <code>trg_inventory_low_stock</code>: 19 ≤ 20 <em>and</em> the old value 35 &gt; 20, so stock has just <strong>crossed</strong> the level. A reorder alert is inserted."},
+           {"t":"end","text":"A trigger fired by a trigger: a <strong>cascading</strong> trigger."}]},
+ {"title":"Not enough stock (BEFORE + RAISE)","expect":"error",
+  "intro":"Try to add 10 × Cheddar (product 7). Only 4 are in stock.",
+  "sql":"INSERT INTO order_item (order_id, product_id, quantity, unit_price)\nVALUES (1009, 7, 10, 3.40);",
+  "watch":[{"label":"inventory: Cheddar","sql":"SELECT product_id, qty_in_stock FROM inventory WHERE product_id = 7"},
+           {"label":"order_item for order 1009","sql":"SELECT order_id, product_id, quantity FROM order_item WHERE order_id = 1009 ORDER BY product_id"}],
+  "steps":[{"t":"before","text":"<code>trg_order_item_check_stock</code>: WHEN 10 &gt; 4 is <strong>true</strong>."},
+           {"t":"error","text":"<code>RAISE(ABORT, 'Not enough stock for this product')</code> stops the statement before the row is written."},
+           {"t":"end","text":"Nothing changed: no order line, stock still 4. In Python this arrives as <code>sqlite3.IntegrityError</code>."}]},
+ {"title":"Editing a delivered order","expect":"error",
+  "intro":"Order 1001 was delivered in September. Try to add another item to it.",
+  "sql":"INSERT INTO order_item (order_id, product_id, quantity, unit_price)\nVALUES (1001, 9, 1, 2.10);",
+  "watch":[{"label":"order_item for order 1001","sql":"SELECT order_id, product_id, quantity, unit_price FROM order_item WHERE order_id = 1001 ORDER BY product_id"}],
+  "steps":[{"t":"before","text":"<code>trg_order_item_lock_insert</code>: the order’s status is Delivered, so the WHEN is true."},
+           {"t":"error","text":"<code>RAISE(ABORT, 'This order can no longer be changed')</code>."},
+           {"t":"end","text":"The financial record of order 1001 is protected, whoever runs the INSERT."}]},
+ {"title":"Cancelling an order returns its stock","expect":"ok",
+  "intro":"Cancel order 1009 (Pending). It contains 1 × Croissants and 1 × Orange Juice.",
+  "sql":"UPDATE orders SET status = 'Cancelled' WHERE order_id = 1009;",
+  "watch":[{"label":"orders","sql":"SELECT order_id, status FROM orders WHERE order_id = 1009"},
+           {"label":"inventory for the order’s products","sql":"SELECT product_id, qty_in_stock FROM inventory WHERE product_id IN (3, 5) ORDER BY product_id"},
+           {"label":"stock_movement","sql":"SELECT product_id, qty_change, reason, order_id FROM stock_movement ORDER BY movement_id"}],
+  "steps":[{"t":"before","text":"<code>trg_orders_status_rules</code>: Pending → Cancelled is an allowed change, so no RAISE."},
+           {"t":"row","text":"The status is updated."},
+           {"t":"after","text":"<code>trg_orders_cancel_restock</code> (WHEN NEW.status = 'Cancelled' AND OLD.status &lt;&gt; 'Cancelled'): adds each line’s quantity back to inventory and logs two ‘order cancelled’ movements."},
+           {"t":"cascade","text":"Each inventory UPDATE fires the reorder triggers (no thresholds crossed here)."},
+           {"t":"end","text":"Uses OLD and NEW together: the trigger only acts on the <em>change</em> into Cancelled."}]},
+ {"title":"An invalid status change","expect":"error",
+  "intro":"Try to move delivered order 1001 back to Pending.",
+  "sql":"UPDATE orders SET status = 'Pending' WHERE order_id = 1001;",
+  "watch":[{"label":"orders","sql":"SELECT order_id, status FROM orders WHERE order_id = 1001"}],
+  "steps":[{"t":"before","text":"<code>trg_orders_status_rules</code>: Delivered → Pending is not in the list of allowed changes."},
+           {"t":"error","text":"<code>RAISE(ABORT, 'Invalid order status change')</code>."},
+           {"t":"end","text":"A CHECK constraint can only test the new value. A trigger can compare OLD with NEW, which is what a workflow rule needs."}]},
+ {"title":"Price change audit","expect":"ok",
+  "intro":"Put the price of Cola (product 1) up from £0.85 to £0.90.",
+  "sql":"UPDATE product SET price = 0.90 WHERE product_id = 1;",
+  "watch":[{"label":"product","sql":"SELECT product_id, name, price FROM product WHERE product_id = 1"},
+           {"label":"price_history","sql":"SELECT history_id, product_id, old_price, new_price FROM price_history ORDER BY history_id"}],
+  "steps":[{"t":"row","text":"The price is updated."},
+           {"t":"after","text":"<code>trg_product_price_history</code> (AFTER UPDATE OF price, WHEN NEW.price &lt;&gt; OLD.price) records 0.85 → 0.90."},
+           {"t":"end","text":"Run it twice: the second time the price is already 0.90, the WHEN is false, and nothing is logged."}]},
+ {"title":"INSTEAD OF: add a line by product name","expect":"ok",
+  "intro":"Insert into the <em>view</em> <code>v_order_lines</code> using a product name and no price.",
+  "sql":"INSERT INTO v_order_lines (order_id, product, quantity)\nVALUES (1009, 'Garden Peas 900g', 2);",
+  "watch":[{"label":"v_order_lines for order 1009","sql":"SELECT * FROM v_order_lines WHERE order_id = 1009 ORDER BY product"},
+           {"label":"inventory: Garden Peas","sql":"SELECT product_id, qty_in_stock FROM inventory WHERE product_id = 11"}],
+  "steps":[{"t":"before","text":"Views store no rows, so SQLite runs <code>trg_v_order_lines_insert</code> <strong>instead of</strong> the insert."},
+           {"t":"when","text":"It RAISEs if no product has that name; ‘Garden Peas 900g’ exists."},
+           {"t":"row","text":"It inserts the real row into <code>order_item</code>, looking up product_id 11 and today’s price (1.30)."},
+           {"t":"cascade","text":"That INSERT fires all the order_item triggers: lock check, stock check, then the sale trigger (stock 90 → 88)."},
+           {"t":"end","text":"The workaround for SQLite’s rule that a trigger cannot assign <code>NEW.unit_price</code>."}]},
+ {"title":"Auditing a customer’s change of e-mail","expect":"ok",
+  "intro":"Jane Morris changes her e-mail address.",
+  "sql":"UPDATE customer SET email = 'jane.m@example.com' WHERE customer_id = 1;",
+  "watch":[{"label":"audit_log","sql":"SELECT log_id, table_name, action, row_key, details FROM audit_log ORDER BY log_id"}],
+  "steps":[{"t":"row","text":"The e-mail is updated."},
+           {"t":"after","text":"<code>trg_customer_audit_update</code> builds a description of only the columns that changed, using CASE with OLD and NEW."},
+           {"t":"end","text":"The audit row records the old and new values, so the change can be explained or reversed later."}]}
+]
+</script>
+  </div>
+  <div class="erd-widget" data-model="shop_v2_logs" data-lock="crow" data-caption="The four supporting tables added in shop_v2, all written by triggers. stock_movement.order_id and audit_log deliberately have no foreign keys, so the history survives deletions."></div>
+</section>
+
+<section class="lsec">
+  <h2 id="audit">Audit logging</h2>
+  <p>An <strong>audit trail</strong> records who changed what, when, from what and to what. Triggers are ideal for this because they cannot be bypassed by forgetting to call a logging function.</p>
+  <ul>
+    <li><strong>What to record:</strong> the table and key of the changed row, the action, the old and new values, and a timestamp (<code>datetime('now')</code> is UTC).</li>
+    <li><strong>No foreign keys on audit tables.</strong> A log must keep its rows even after the audited row is deleted, so <code>audit_log</code> has none.</li>
+    <li><strong>Who made the change?</strong> SQLite has no user accounts, so it has no <code>CURRENT_USER</code>. The application must record the user, for example by writing to an <code>changed_by</code> column. Client–server databases can log the database user automatically.</li>
+    <li><strong>Personal data.</strong> Audit logs of customer details are themselves personal data under UK GDPR: decide how long to keep them, and who may read them.</li>
+  </ul>
+  <pre><code class="language-sql" data-file="migration_v2_triggers.sql (extract)">
+CREATE TRIGGER trg_customer_audit_update
+AFTER UPDATE OF email, phone, address_line, postcode ON customer
+FOR EACH ROW
+WHEN OLD.email IS NOT NEW.email OR OLD.phone IS NOT NEW.phone
+  OR OLD.address_line IS NOT NEW.address_line OR OLD.postcode IS NOT NEW.postcode
+BEGIN
+    INSERT INTO audit_log (table_name, action, row_key, details)
+    VALUES ('customer', 'UPDATE', 'customer_id=' || NEW.customer_id,
+            CASE WHEN OLD.email IS NOT NEW.email
+                 THEN 'email: ' || OLD.email || ' -> ' || NEW.email || '; ' ELSE '' END ||
+            CASE WHEN OLD.phone IS NOT NEW.phone
+                 THEN 'phone: ' || IFNULL(OLD.phone, 'NULL') || ' -> ' || IFNULL(NEW.phone, 'NULL') || '; ' ELSE '' END ||
+            CASE WHEN OLD.address_line IS NOT NEW.address_line
+                 THEN 'address: ' || OLD.address_line || ' -> ' || NEW.address_line || '; ' ELSE '' END ||
+            CASE WHEN OLD.postcode IS NOT NEW.postcode
+                 THEN 'postcode: ' || OLD.postcode || ' -> ' || NEW.postcode || '; ' ELSE '' END);
+END;
+</code></pre>
+  <div class="playground" data-db="shop_v2" data-title="Live coding 2: audit trail in shop_v2">
+<script type="text/plain" class="pg-sql">
+-- Change two details, then one that is not audited (first_name)
+UPDATE customer SET postcode = 'SO19 9ZZ', phone = NULL WHERE customer_id = 1;
+UPDATE customer SET first_name = 'Janet' WHERE customer_id = 1;
+
+-- Tom has no orders, so he can be deleted: the delete is audited too
+DELETE FROM customer WHERE customer_id = 8;
+
+SELECT action, row_key, details FROM audit_log ORDER BY log_id;
+</script>
+  </div>
+</section>
+
+<section class="lsec">
+  <h2 id="cascading">Cascading, recursion and firing order</h2>
+  <dl class="terms">
+    <dt>Cascading triggers</dt><dd>A trigger’s action can fire other triggers, as when a sale updates inventory, which raises a reorder alert. SQLite allows this, up to a depth limit of 1000.</dd>
+    <dt>Recursive triggers</dt><dd>A trigger that (directly or indirectly) fires <em>itself</em>, e.g. an AFTER UPDATE on inventory that updates inventory. SQLite blocks this by default (<code>PRAGMA recursive_triggers</code> is OFF). Do not turn it on unless you are sure the recursion stops.</dd>
+    <dt>Foreign-key actions fire triggers</dt><dd><code>ON DELETE CASCADE</code> deletes child rows as if by a DELETE statement, so their DELETE triggers run. Deleting a pending order in shop_v2 therefore returns its stock through <code>trg_order_item_removed</code>.</dd>
+    <dt>Several triggers on one event</dt><dd>The order is <strong>not guaranteed</strong>. Current SQLite versions happen to run the most recently created first, but do not rely on it: write triggers that do not depend on each other’s order.</dd>
+  </dl>
+  <div class="playground" data-db="shop_v2" data-title="A foreign-key cascade fires DELETE triggers">
+<script type="text/plain" class="pg-sql">
+-- A new pending order for Tom with 5 sparkling waters (stock 180 -> 175)
+INSERT INTO orders (order_id, customer_id, order_date, status) VALUES (3000, 8, '2026-02-10', 'Pending');
+INSERT INTO order_item VALUES (3000, 2, 5, 0.60);
+SELECT 'after sale' AS moment, qty_in_stock FROM inventory WHERE product_id = 2;
+
+-- Deleting the ORDER cascades to its order_item rows, whose DELETE trigger returns the stock
+DELETE FROM orders WHERE order_id = 3000;
+SELECT 'after delete' AS moment, qty_in_stock FROM inventory WHERE product_id = 2;
+SELECT product_id, qty_change, reason, order_id FROM stock_movement ORDER BY movement_id;
+</script>
+  </div>
+</section>
+
+<section class="lsec">
+  <h2 id="instead-of">INSTEAD OF triggers on views</h2>
+  <p>A <strong>view</strong> is a stored query that behaves like a read-only table (Week 3 covers views in depth). You cannot INSERT into a view directly, because it has no rows of its own. An <code>INSTEAD OF</code> trigger tells SQLite what to do <em>instead</em>, usually by changing the underlying tables.</p>
+  <pre><code class="language-sql" data-file="migration_v2_triggers.sql (extract)">
+CREATE VIEW v_order_lines AS
+SELECT oi.order_id, p.name AS product, oi.quantity, oi.unit_price
+FROM   order_item AS oi
+JOIN   product    AS p ON p.product_id = oi.product_id;
+
+CREATE TRIGGER trg_v_order_lines_insert
+INSTEAD OF INSERT ON v_order_lines
+FOR EACH ROW
+BEGIN
+    SELECT RAISE(ABORT, 'Unknown product name')
+    WHERE NOT EXISTS (SELECT 1 FROM product WHERE name = NEW.product);
+
+    INSERT INTO order_item (order_id, product_id, quantity, unit_price)
+    SELECT NEW.order_id, product_id, NEW.quantity, price
+    FROM   product
+    WHERE  name = NEW.product;
+END;
+</code></pre>
+  <p>Notice two techniques: <code>SELECT RAISE(…) WHERE …</code> raises only when the WHERE finds a row, which works like an IF; and the <code>INSERT … SELECT</code> fills in <code>unit_price</code> from the product table, because SQLite will not let a trigger assign <code>NEW.unit_price</code>.</p>
+  <div class="playground" data-db="shop_v2" data-title="Live coding 3: insert through a view">
+<script type="text/plain" class="pg-sql">
+INSERT INTO v_order_lines (order_id, product, quantity) VALUES (1009, 'Garden Peas 900g', 2);
+SELECT * FROM v_order_lines WHERE order_id = 1009;
+
+-- Now try a product that does not exist (select just this line and run it):
+-- INSERT INTO v_order_lines (order_id, product, quantity) VALUES (1009, 'Unicorn Steak', 1);
+</script>
+  </div>
+</section>
+
+<section class="lsec">
+  <h2 id="comparison">SQLite triggers compared with other databases</h2>
+  <p>The ideas are the same everywhere, but the details differ. If you later work with another database, these are the differences that catch people out.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Feature</th><th>SQLite</th><th>MySQL / MariaDB</th><th>PostgreSQL</th><th>SQL Server</th><th>Oracle</th></tr></thead>
+    <tbody>
+      <tr><td>Row-level triggers</td><td>Yes (the only kind)</td><td>Yes (the only kind)</td><td>Yes</td><td>No</td><td>Yes</td></tr>
+      <tr><td>Statement-level triggers</td><td>No</td><td>No</td><td>Yes</td><td>Yes (the only kind)</td><td>Yes</td></tr>
+      <tr><td>BEFORE triggers</td><td>Yes</td><td>Yes</td><td>Yes</td><td>No (AFTER and INSTEAD OF only)</td><td>Yes</td></tr>
+      <tr><td>INSTEAD OF</td><td>Views only</td><td>Not supported</td><td>Views only</td><td>Tables and views</td><td>Views</td></tr>
+      <tr><td>Can change the incoming row</td><td><strong>No</strong></td><td>Yes: <code>SET NEW.col = …</code></td><td>Yes: return a modified <code>NEW</code></td><td>—</td><td>Yes: <code>:NEW.col := …</code></td></tr>
+      <tr><td>Old/new values</td><td><code>OLD</code>, <code>NEW</code></td><td><code>OLD</code>, <code>NEW</code></td><td><code>OLD</code>, <code>NEW</code></td><td><code>deleted</code>, <code>inserted</code> pseudo-tables</td><td><code>:OLD</code>, <code>:NEW</code></td></tr>
+      <tr><td>Trigger body</td><td>Plain SQL statements; no variables, IF or loops</td><td>Procedural SQL (IF, DECLARE)</td><td>Calls a trigger <em>function</em> (e.g. PL/pgSQL)</td><td>T-SQL batch</td><td>PL/SQL block</td></tr>
+      <tr><td>Signalling an error</td><td><code>RAISE(ABORT, 'msg')</code></td><td><code>SIGNAL SQLSTATE '45000'</code></td><td><code>RAISE EXCEPTION</code></td><td><code>THROW</code> / <code>RAISERROR</code></td><td><code>RAISE_APPLICATION_ERROR</code></td></tr>
+      <tr><td>Order of several triggers</td><td>Not guaranteed</td><td><code>FOLLOWS</code> / <code>PRECEDES</code></td><td>Alphabetical by name</td><td>First/last via <code>sp_settriggerorder</code></td><td><code>FOLLOWS</code></td></tr>
+    </tbody></table></div>
+  <div class="callout note"><p class="callout-title">Why the original slides mention SQL Server functions</p><p>Some older module material used SQL Server syntax. SQL Server has no BEFORE triggers and processes a whole statement at once through the <code>inserted</code> and <code>deleted</code> tables. Code written for it will not run in SQLite, and the reverse is also true. Everything in this module is SQLite.</p></div>
+</section>
+
+<section class="lsec">
+  <h2 id="python">Triggers from Python</h2>
+  <p>Your Tkinter application (Week 4 onwards) never calls a trigger: it just runs INSERT, UPDATE and DELETE statements, and the triggers fire. What it <em>must</em> do is handle the errors they raise and show a friendly message. <code>trigger_demo_v2.py</code> shows the pattern.</p>
+  <pre><code class="language-python" data-file="trigger_demo_v2.py">
+def add_line(con, order_id, product_id, qty, price):
+    """Insert one order line; the triggers decide whether it is allowed."""
+    try:
+        with con:                                   # commit, or roll back on error
+            con.execute(
+                "INSERT INTO order_item (order_id, product_id, quantity, unit_price) "
+                "VALUES (?, ?, ?, ?)",
+                (order_id, product_id, qty, price))
+        print(f"  OK: added {qty} x product {product_id} to order {order_id}")
+    except sqlite3.IntegrityError as err:           # RAISE(ABORT, ...) arrives here
+        print(f"  Refused by a trigger: {err}")     # in Tkinter: messagebox.showerror(...)
+</code></pre>
+  <ul>
+    <li><code>RAISE(ABORT, 'msg')</code> becomes <code>sqlite3.IntegrityError</code> whose text is your message, so write messages a user can understand.</li>
+    <li><code>with con:</code> makes the statement and everything its triggers did a single transaction.</li>
+    <li>The demo copies the database into memory with <code>disk.backup(mem)</code>, so you can run it again and again without changing <code>shop_v2.db</code>.</li>
+  </ul>
+  <details class="expand"><summary>Expected output of <code>py trigger_demo_v2.py</code></summary><div class="expand-body">
+  <pre><code class="language-plaintext">
+1. A normal sale: AFTER INSERT reduces stock and logs the movement
+  OK: added 2 x product 9 to order 1009
+  Basmati Rice stock: 70 -> 68
+
+2. Not enough stock: BEFORE INSERT raises an error and nothing changes
+  Refused by a trigger: Not enough stock for this product
+  Cheddar stock still 4 (was 4)
+
+3. A cascade: the sale trigger updates inventory, which fires the reorder trigger
+  OK: added 16 x product 3 to order 1008
+  Reorder alert: product 3 has 19 (level 20)
+
+4. Locked orders: order 1001 has been delivered
+  Refused by a trigger: This order can no longer be changed
+
+5. Cancelling order 1009 returns its stock (AFTER UPDATE OF status)
+  Rice before cancel: 68
+  Rice after cancel:  70
+
+6. Price change audit (AFTER UPDATE OF price ... WHEN NEW.price &lt;&gt; OLD.price)
+  Cola: 0.80 -> 0.85
+  Cola: 0.85 -> 0.90
+
+7. Stock movements recorded by the triggers in this demo
+  product  9    -2  sale             order 1009
+  product  3   -16  sale             order 1008
+  product  3    +1  order cancelled  order 1009
+  product  5    +1  order cancelled  order 1009
+  product  9    +2  order cancelled  order 1009
+</code></pre></div></details>
+  <div class="callout task"><p class="callout-title">Live coding 4 (lecturer demo)</p><ol>
+    <li>Run <code>py build_shop_db_v2.py</code>. Note the order: data first, then triggers. Why would loading the sample orders <em>after</em> creating the triggers be wrong?</li>
+    <li>Run <code>py trigger_demo_v2.py</code> and match each block of output to a trigger.</li>
+    <li>Open <code>shop_v2.db</code> in DB Browser, find the triggers under <em>Database Structure</em>, and fire one by hand in <em>Execute SQL</em>.</li>
+  </ol></div>
+  <details class="expand answer"><summary>Answer to question 1</summary><div class="expand-body"><p>The stock levels in <code>seed_v1.sql</code> are <em>current</em> figures, recorded after those orders were made. With the triggers already in place, loading the 23 sample order lines would subtract their quantities a second time and log 23 fake ‘sale’ movements. When loading historical data, create the triggers last, or check carefully what they will do.</p></div></details>
+</section>
+
+<section class="lsec">
+  <h2 id="debugging">Debugging and common mistakes</h2>
+  <h3 id="debug-steps">A debugging routine</h3>
+  <ol class="steps">
+    <li><strong>Confirm the trigger exists and is the version you think:</strong> <code>SELECT sql FROM sqlite_master WHERE type='trigger' AND name='…';</code></li>
+    <li><strong>Test the WHEN condition on its own</strong> as a SELECT, replacing <code>NEW.x</code> with real values (or use <code>IIF</code>).</li>
+    <li><strong>Fire it with one row</strong> and look at every table it should change, before and after (just like the trigger lab).</li>
+    <li><strong>Add a temporary log:</strong> <code>INSERT INTO debug_log VALUES ('reached step 2', NEW.quantity);</code> inside the body, then remove it.</li>
+    <li><strong>Check for other triggers on the same table</strong> that might interfere: <code>SELECT name FROM sqlite_master WHERE type='trigger' AND tbl_name='order_item';</code></li>
+  </ol>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Mistake</th><th>Symptom</th><th>Fix</th></tr></thead>
+    <tbody>
+      <tr><td>Fixed values in the body (<code>SET qty_in_stock = 99 WHERE product_id = 9</code>)</td><td>Works for one test, wrong for every other row</td><td>Use <code>NEW.</code>/<code>OLD.</code> values</td></tr>
+      <tr><td><code>NEW</code> in a DELETE trigger, or <code>OLD</code> in an INSERT trigger</td><td><code>no such column: NEW.quantity</code>, but only when it fires</td><td>DELETE: OLD only; INSERT: NEW only</td></tr>
+      <tr><td>No <code>WHEN</code> on an UPDATE trigger</td><td>Logs or adjusts even when nothing really changed</td><td><code>WHEN NEW.x IS NOT OLD.x</code></td></tr>
+      <tr><td>Comparing with NULL using <code>=</code> or <code>&lt;&gt;</code></td><td>Condition silently false</td><td><code>IS</code>, <code>IS NOT</code>, <code>COALESCE</code></td></tr>
+      <tr><td>Creating triggers before loading historical data</td><td>Stock counted twice; fake log rows</td><td>Load data first, or disable the logic for the load</td></tr>
+      <tr><td><code>trigger … already exists</code></td><td>Error when re-running a script</td><td><code>DROP TRIGGER IF EXISTS …;</code> first, or <code>CREATE TRIGGER IF NOT EXISTS</code></td></tr>
+      <tr><td>Relying on the order of two triggers</td><td>Works today, breaks after a rebuild</td><td>Combine them, or make them independent</td></tr>
+      <tr><td>A trigger that updates its own table</td><td>Nothing happens (recursion is off), or an infinite loop if recursion is turned on</td><td>Redesign; use a separate table</td></tr>
+      <tr><td><code>RAISE()</code> in an ordinary query</td><td><code>RAISE() may only be used within a trigger-program</code></td><td>Only inside a trigger body</td></tr>
+      <tr><td>Message built with <code>||</code> in RAISE</td><td><code>near "||": syntax error</code></td><td>Use a fixed string literal</td></tr>
+    </tbody></table></div>
+</section>
+
+<section class="lsec">
+  <h2 id="summary">Summary and next steps</h2>
+  <ul>
+    <li>A trigger is event → (condition) → action, fired automatically for <strong>each row</strong>.</li>
+    <li><strong>BEFORE</strong> validates and refuses with <code>RAISE</code>; <strong>AFTER</strong> carries out consequences in other tables; <strong>INSTEAD OF</strong> makes views updatable.</li>
+    <li>INSERT has <code>NEW</code>, DELETE has <code>OLD</code>, UPDATE has both. Use <code>UPDATE OF</code> and <code>WHEN</code> so a trigger only fires when it should.</li>
+    <li><code>RAISE(ABORT)</code> undoes everything the statement did, including other triggers’ work, and arrives in Python as <code>IntegrityError</code>.</li>
+    <li>SQLite triggers are row-level only, cannot assign <code>NEW</code>, have plain-SQL bodies and fire in an unguaranteed order.</li>
+    <li>Audit tables record old and new values and have no foreign keys.</li>
+  </ul>
+  <div class="callout assess"><p class="callout-title">For your project this week</p><p>Design at least three triggers for your own scenario so that, between them, they cover INSERT, UPDATE and DELETE and both BEFORE and AFTER timing. Write the business rule each one enforces, and plan one test that it accepts good data and one that it refuses bad data.</p></div>
+  <p><strong>Next week: views, functions and query optimisation.</strong> You have already met one view, <code>v_order_lines</code>. Next week you will build reporting views over the shop, use SQLite’s built-in functions, and measure query speed with <code>EXPLAIN QUERY PLAN</code>.</p>
+  <div class="complete-bar" data-part="lecture"></div>
+</section>
+      </div>
+
+<!-- =========================================================== SEMINAR -->
+      <div class="tabpanel" role="tabpanel" id="panel-seminar" aria-labelledby="tab-seminar" hidden>
+
+<section class="lsec">
+  <h2 id="seminar-plan">Seminar plan</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Time</th><th>Activity</th><th>Format</th></tr></thead>
+    <tbody>
+      <tr><td>0:00–0:15</td><td><a href="#predict">1. Predict the outcome</a></td><td>Pairs, then whole class</td></tr>
+      <tr><td>0:15–0:45</td><td><a href="#guided-stock">2. Guided: stock control on INSERT</a></td><td>Individual, at the computer</td></tr>
+      <tr><td>0:45–1:05</td><td><a href="#update-delete">3. UPDATE and DELETE triggers</a></td><td>Pairs</td></tr>
+      <tr><td>1:05–1:25</td><td><a href="#order-totals">4. Order totals</a> or <a href="#restock">5. Restocking</a></td><td>Choose one</td></tr>
+      <tr><td>1:25–1:40</td><td><a href="#debug-clinic">6. Debugging clinic</a></td><td>Pairs</td></tr>
+      <tr><td>1:40–2:00</td><td><a href="#own-project">7. Plan your project’s triggers</a></td><td>Individual</td></tr>
+    </tbody></table></div>
+  <p>Activities 2–6 use <code>shop_v1</code>, the database <em>without</em> triggers, so that you write them yourself. Each playground has its own copy, and <strong>Reset</strong> removes everything you created.</p>
+</section>
+
+<section class="lsec">
+  <h2 id="predict">Activity 1: Predict the outcome</h2>
+  <div class="callout seminar"><p class="callout-title">In pairs: decide first, then check in the trigger lab</p><p>Using <code>shop_v2</code>’s triggers, what happens in each case? Which triggers fire, and which tables change?</p><ol>
+    <li><code>UPDATE product SET price = 0.85 WHERE product_id = 1;</code> (the price is already 0.85)</li>
+    <li><code>DELETE FROM order_item WHERE order_id = 1008 AND product_id = 11;</code> (order 1008 is Paid)</li>
+    <li><code>UPDATE orders SET status = 'Shipped' WHERE order_id = 1009;</code> (order 1009 is Pending)</li>
+    <li><code>UPDATE order_item SET quantity = 2 WHERE order_id = 1008 AND product_id = 10;</code> (currently 2)</li>
+    <li><code>DELETE FROM orders WHERE order_id = 1009;</code></li>
+  </ol></div>
+  <details class="expand answer"><summary>Answers</summary><div class="expand-body"><ol>
+    <li><code>trg_product_price_history</code> fires (UPDATE OF price), but its WHEN <code>NEW.price &lt;&gt; OLD.price</code> is false, so nothing is logged.</li>
+    <li>Allowed (Paid orders are not locked). <code>trg_order_item_removed</code> returns 1 Garden Peas to stock (90 → 91) and logs a ‘sale removed’ movement.</li>
+    <li>Refused by <code>trg_orders_status_rules</code>: Pending can only become Paid or Cancelled.</li>
+    <li>The update runs, but <code>trg_order_item_amend</code>’s WHEN <code>NEW.quantity &lt;&gt; OLD.quantity</code> is false, so stock is not touched.</li>
+    <li>Allowed (Pending). The foreign key cascades to its two order lines, and <code>trg_order_item_removed</code> fires for each, returning 1 Croissants and 1 Orange Juice to stock.</li>
+  </ol></div></details>
+  <div class="playground" data-db="shop_v2" data-title="Check your predictions">
+<script type="text/plain" class="pg-sql">
+-- Run one statement at a time (select it, then Run), then look at the tables
+DELETE FROM order_item WHERE order_id = 1008 AND product_id = 11;
+SELECT product_id, qty_in_stock FROM inventory WHERE product_id = 11;
+SELECT product_id, qty_change, reason, order_id FROM stock_movement;
+</script>
+  </div>
+</section>
+
+<section class="lsec">
+  <h2 id="guided-stock">Activity 2: Guided: stock control on INSERT</h2>
+  <div class="callout seminar"><p class="callout-title">Write two triggers on <code>shop_v1</code></p><ol>
+    <li><strong>BEFORE INSERT on order_item</strong>: refuse the line with the message <code>'Not enough stock'</code> if the quantity is larger than the stock. Remember the NULL trap.</li>
+    <li><strong>AFTER INSERT on order_item</strong>: reduce <code>inventory.qty_in_stock</code> by the quantity ordered.</li>
+    <li>Test both: one order that succeeds (check that stock falls) and one that is refused (check that nothing changes).</li>
+  </ol></div>
+  <div class="playground" data-db="shop_v1" data-title="Your triggers (shop_v1)">
+<script type="text/plain" class="pg-sql">
+-- TODO 1: CREATE TRIGGER check_stock BEFORE INSERT ON order_item ...
+
+-- TODO 2: CREATE TRIGGER reduce_stock AFTER INSERT ON order_item ...
+
+-- Tests
+SELECT product_id, qty_in_stock FROM inventory WHERE product_id IN (7, 9);
+-- INSERT INTO order_item VALUES (1009, 9, 2, 2.10);    -- should succeed: rice 70 -> 68
+-- INSERT INTO order_item VALUES (1009, 7, 10, 3.40);   -- should fail: only 4 cheddar
+</script>
+  </div>
+  <details class="expand"><summary>Hints</summary><div class="expand-body"><ul>
+    <li>The condition compares <code>NEW.quantity</code> with a subquery on <code>inventory</code> for <code>NEW.product_id</code>.</li>
+    <li>Wrap the subquery in <code>COALESCE(…, 0)</code> so a missing stock row counts as zero.</li>
+    <li>The AFTER trigger is an UPDATE with <code>WHERE product_id = NEW.product_id</code>.</li>
+  </ul></div></details>
+  <details class="expand answer"><summary>Model answer (seminar/w2_stock_triggers.sql)</summary><div class="expand-body">
+  <pre><code class="language-sql" data-test="shop_v1">
+CREATE TRIGGER check_stock
+BEFORE INSERT ON order_item
+FOR EACH ROW
+WHEN NEW.quantity > COALESCE((SELECT qty_in_stock FROM inventory WHERE product_id = NEW.product_id), 0)
+BEGIN
+    SELECT RAISE(ABORT, 'Not enough stock');
+END;
+
+CREATE TRIGGER reduce_stock
+AFTER INSERT ON order_item
+FOR EACH ROW
+BEGIN
+    UPDATE inventory SET qty_in_stock = qty_in_stock - NEW.quantity
+    WHERE product_id = NEW.product_id;
+END;
+</code></pre>
+  <p>The playground below has the model answer (including Activity 3’s triggers) already loaded. Run the tests:</p>
+  <div class="playground" data-db="shop_v1" data-setup-src="downloads/week02/seminar/w2_stock_triggers.sql" data-title="Model answer loaded: test it">
+<script type="text/plain" class="pg-sql">
+INSERT INTO order_item VALUES (1009, 9, 2, 2.10);                         -- rice 70 -> 68
+UPDATE order_item SET quantity = 5 WHERE order_id = 1009 AND product_id = 9;  -- 68 -> 65
+DELETE FROM order_item WHERE order_id = 1009 AND product_id = 9;          -- 65 -> 70
+SELECT product_id, qty_in_stock FROM inventory WHERE product_id = 9;
+</script>
+  </div></div></details>
+</section>
+
+<section class="lsec">
+  <h2 id="update-delete">Activity 3: UPDATE and DELETE triggers</h2>
+  <p>This is the original Week 2 extra task. A customer changes their mind about a quantity, or removes an item from their basket. The stock must follow.</p>
+  <div class="callout seminar"><p class="callout-title">Add to your Activity 2 work</p><ol>
+    <li><strong>AFTER UPDATE OF quantity on order_item</strong>: adjust stock by the <em>difference</em> between the old and new quantities. Only act when the quantity really changed.</li>
+    <li><strong>AFTER DELETE on order_item</strong>: put the removed quantity back into stock.</li>
+    <li>Explain in one sentence why the UPDATE trigger needs both OLD and NEW, and why the DELETE trigger can only use OLD.</li>
+  </ol></div>
+  <details class="expand answer"><summary>Model answer</summary><div class="expand-body">
+  <pre><code class="language-sql" data-test="shop_v1">
+CREATE TRIGGER adjust_stock
+AFTER UPDATE OF quantity ON order_item
+FOR EACH ROW
+WHEN NEW.quantity <> OLD.quantity
+BEGIN
+    UPDATE inventory SET qty_in_stock = qty_in_stock - (NEW.quantity - OLD.quantity)
+    WHERE product_id = NEW.product_id;
+END;
+
+CREATE TRIGGER return_stock
+AFTER DELETE ON order_item
+FOR EACH ROW
+BEGIN
+    UPDATE inventory SET qty_in_stock = qty_in_stock + OLD.quantity
+    WHERE product_id = OLD.product_id;
+END;
+</code></pre>
+  <p>The change in stock depends on how the quantity <em>changed</em> (NEW − OLD), so the UPDATE trigger needs both. A deleted row has no new version, so only OLD exists. Extension: what should happen if the increase is larger than the stock? (Compare <code>trg_order_item_check_amend</code> in shop_v2.)</p></div></details>
+</section>
+
+<section class="lsec">
+  <h2 id="order-totals">Activity 4: Keeping an order total up to date</h2>
+  <p>The original Task 1 asked for an <code>order_cost</code> table maintained by triggers. Build <code>order_total(order_id, total)</code> and keep it correct whenever an order line is inserted, updated or deleted.</p>
+  <div class="callout warn"><p class="callout-title">Discuss before you build</p><p><code>order_total</code> stores a value that can be calculated from <code>order_item</code>, so it is <strong>denormalisation</strong> (Week 1). When is that worth it, and what could go wrong? Next week you will meet the alternative: a view that calculates totals on demand.</p></div>
+  <details class="expand"><summary>Hint: recalculate, don’t increment</summary><div class="expand-body"><p>Adding and subtracting amounts in each trigger works, but one mistake makes the total drift for ever. Recalculating with <code>SELECT SUM(quantity * unit_price) FROM order_item WHERE order_id = …</code> in every trigger is simpler and self-correcting.</p></div></details>
+  <details class="expand answer"><summary>Model answer (seminar/w2_order_totals.sql)</summary><div class="expand-body">
+  <div class="playground" data-db="shop_v1" data-setup-src="downloads/week02/seminar/w2_order_totals.sql" data-title="Order totals: model answer loaded">
+<script type="text/plain" class="pg-sql">
+SELECT * FROM order_total WHERE order_id IN (1001, 1009);   -- 1001 = 3.80
+
+INSERT INTO order_item VALUES (1009, 9, 2, 2.10);           -- 1009 grows by 4.20
+SELECT * FROM order_total WHERE order_id = 1009;
+
+DELETE FROM order_item WHERE order_id = 1009;               -- back to 0
+SELECT * FROM order_total WHERE order_id = 1009;
+
+SELECT name, tbl_name FROM sqlite_master WHERE type = 'trigger';
+</script>
+  </div></div></details>
+</section>
+
+<section class="lsec">
+  <h2 id="restock">Activity 5: Restocking through a movement log</h2>
+  <p>Warehouse staff should never edit <code>inventory</code> directly. Instead they record a delivery (<em>restock</em>) or a write-off (<em>damaged</em>) in a <code>stock_movement</code> table, and triggers do the rest.</p>
+  <div class="callout seminar"><p class="callout-title">Requirements</p><ol>
+    <li>Create <code>stock_movement(movement_id, product_id, qty_change, reason, moved_at)</code> where reason is ‘restock’ or ‘damaged’.</li>
+    <li>BEFORE INSERT: a restock must be positive and a write-off negative.</li>
+    <li>BEFORE INSERT: a write-off cannot remove more than is in stock.</li>
+    <li>AFTER INSERT: apply the change to inventory, and set <code>last_restocked</code> to the movement’s date for deliveries.</li>
+  </ol></div>
+  <details class="expand answer"><summary>Model answer (seminar/w2_restock.sql)</summary><div class="expand-body">
+  <div class="playground" data-db="shop_v1" data-setup-src="downloads/week02/seminar/w2_restock.sql" data-title="Restocking: model answer loaded">
+<script type="text/plain" class="pg-sql">
+INSERT INTO stock_movement (product_id, qty_change, reason, moved_at)
+VALUES (7, 20, 'restock', '2026-02-12 10:00:00');           -- Cheddar 4 -> 24
+SELECT product_id, qty_in_stock, last_restocked FROM inventory WHERE product_id = 7;
+
+-- These should be refused (select one at a time):
+-- INSERT INTO stock_movement (product_id, qty_change, reason) VALUES (7, -1, 'restock');
+-- INSERT INTO stock_movement (product_id, qty_change, reason) VALUES (7, -100, 'damaged');
+</script>
+  </div></div></details>
+</section>
+
+<section class="lsec">
+  <h2 id="debug-clinic">Activity 6: Debugging clinic</h2>
+  <p>Each trigger below has a bug. Find it, explain the symptom, and fix it. Bug 1 comes from the original Week 2 slides.</p>
+  <div class="two-col">
+    <div><p><strong>Bug 1</strong></p><pre><code class="language-sql" data-test="shop_v1">
+CREATE TRIGGER Trigger1
+AFTER INSERT ON order_item
+BEGIN
+  UPDATE inventory
+  SET qty_in_stock = 99
+  WHERE product_id = 101;
+END;
+</code></pre></div>
+    <div><p><strong>Bug 2</strong></p><pre><code class="language-sql" data-test="shop_v1">
+CREATE TRIGGER return_stock
+AFTER DELETE ON order_item
+BEGIN
+  UPDATE inventory
+  SET qty_in_stock = qty_in_stock + NEW.quantity
+  WHERE product_id = NEW.product_id;
+END;
+</code></pre></div>
+  </div>
+  <p><strong>Bug 3</strong></p>
+  <pre><code class="language-sql" data-test="shop_v1">
+CREATE TABLE price_log (product_id INTEGER, old_price REAL, new_price REAL,
+                        changed_at TEXT DEFAULT (datetime('now')));
+CREATE TRIGGER price_log_trg
+AFTER UPDATE ON product
+BEGIN
+  INSERT INTO price_log (product_id, old_price, new_price)
+  VALUES (NEW.product_id, OLD.price, NEW.price);
+END;
+</code></pre>
+  <div class="playground" data-db="shop_v1" data-title="Reproduce the bugs here">
+<script type="text/plain" class="pg-sql">
+-- Paste a buggy trigger, then fire it. For Bug 3, try renaming a product:
+-- UPDATE product SET name = 'Cola can 330ml' WHERE product_id = 1;
+-- SELECT * FROM price_log;
+SELECT 'ready' AS status;
+</script>
+  </div>
+  <details class="expand answer"><summary>Answers (seminar/w2_debugging_fixed.sql)</summary><div class="expand-body"><ol>
+    <li><strong>Bug 1:</strong> fixed values. Every sale sets the stock of one hard-coded product (101, which does not even exist in our shop) to 99. Use <code>qty_in_stock - NEW.quantity</code> and <code>WHERE product_id = NEW.product_id</code>.</li>
+    <li><strong>Bug 2:</strong> <code>NEW</code> in a DELETE trigger. It is created without error, but deleting a line fails with <code>no such column: NEW.quantity</code>. Use <code>OLD</code>.</li>
+    <li><strong>Bug 3:</strong> it fires on <em>every</em> UPDATE of product (renaming it, or setting the same price) and logs fake “changes”. Use <code>AFTER UPDATE OF price</code> and <code>WHEN NEW.price &lt;&gt; OLD.price</code>.</li>
+  </ol></div></details>
+</section>
+
+<section class="lsec">
+  <h2 id="own-project">Activity 7: Plan your project’s triggers</h2>
+  <div class="callout assess"><p class="callout-title">Part 2 of the assessment</p><p>At least three different triggers covering INSERT, UPDATE and DELETE, categorised by BEFORE and AFTER timing, that implement your business needs.</p></div>
+  <p>Fill in a table like this for <em>your</em> scenario, not the shop’s:</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Requirement</th><th>Event</th><th>Timing</th><th>Condition (WHEN)</th><th>Action</th><th>Test: accepted / refused</th></tr></thead>
+    <tbody>
+      <tr><td><em>R3: “A room cannot be double-booked”</em></td><td>INSERT on booking</td><td>BEFORE</td><td>an overlapping booking exists</td><td>RAISE(ABORT, …)</td><td>free slot accepted; clash refused</td></tr>
+      <tr><td>…</td><td>UPDATE …</td><td>AFTER</td><td>…</td><td>…</td><td>…</td></tr>
+      <tr><td>…</td><td>DELETE …</td><td>…</td><td>…</td><td>…</td><td>…</td></tr>
+    </tbody></table></div>
+  <ul class="checklist" data-id="week02-project">
+    <li><span>At least one INSERT, one UPDATE and one DELETE trigger</span></li>
+    <li><span>At least one BEFORE and one AFTER trigger</span></li>
+    <li><span>Each trigger linked to a written client requirement</span></li>
+    <li><span>Each trigger tested with data it should accept <em>and</em> data it should refuse, with screenshots</span></li>
+  </ul>
+  <div class="callout warn"><p class="callout-title">Academic integrity</p><p>The shop’s triggers are teaching examples. Your triggers must come from your own scenario’s rules and be written by you; generative AI is not permitted for the assessment.</p></div>
+</section>
+
+<section class="lsec">
+  <h2 id="independent">Independent practice</h2>
+  <ol>
+    <li><strong>Loyalty points.</strong> Add <code>loyalty_points</code> to customer. When an order becomes Delivered, award 1 point per whole pound spent (AFTER UPDATE OF status, using OLD and NEW).</li>
+    <li><strong>No price drops below cost.</strong> Add <code>cost_price</code> to product and refuse any price update that would sell below cost (BEFORE UPDATE OF price).</li>
+    <li><strong>Soft delete.</strong> Instead of deleting customers, add an <code>archived</code> flag and write an INSTEAD OF DELETE trigger on a view <code>v_active_customers</code> that sets the flag.</li>
+    <li><strong>Trace a cascade.</strong> On paper, list every trigger that fires (in any order) when order 1008 is cancelled in shop_v2. Then check with the trigger lab.</li>
+    <li><strong>Compare.</strong> Rewrite <code>trg_order_item_check_stock</code> as it would look in MySQL (<code>SIGNAL SQLSTATE '45000'</code>). Which SQLite limitation disappears?</li>
+  </ol>
+  <div class="complete-bar" data-part="seminar"></div>
+</section>
+      </div>
+
+<!-- =========================================================== SELF-CHECK -->
+      <div class="tabpanel" role="tabpanel" id="panel-selfcheck" aria-labelledby="tab-selfcheck" hidden>
+<section class="lsec">
+  <h2 id="quiz">Self-assessment quiz</h2>
+  <p>Twelve questions on this week’s lecture. Score 70% or more to complete this part of the week.</p>
+  <div class="quiz" data-title="Week 2: Database triggers" data-progress="week02">
+<script type="application/json">
+[
+ {"q":"In a DELETE trigger, which row values can you use?","options":["NEW only","OLD only","Both OLD and NEW","Neither"],"answer":1,"explain":"A deleted row has no new version, so only OLD exists. Using NEW is accepted when the trigger is created but fails with ‘no such column’ when it fires."},
+ {"q":"You want to refuse an order line when there is not enough stock. Which timing is most appropriate?","options":["AFTER INSERT","BEFORE INSERT","INSTEAD OF INSERT","AFTER DELETE"],"answer":1,"explain":"BEFORE triggers run before the row is written, which is the right place to validate and RAISE."},
+ {"q":"Where can an INSTEAD OF trigger be created in SQLite?","options":["On any table","Only on views","Only on tables with a primary key","Only on temporary tables"],"answer":1,"explain":"SQLite only supports INSTEAD OF triggers on views. On a table, CREATE TRIGGER fails."},
+ {"q":"What does <code>RAISE(ABORT, 'Not enough stock')</code> do?","options":["Skips the current row and continues","Undoes all changes made by the current statement (including by triggers) and returns an error","Rolls back the whole transaction","Prints a warning but keeps the change"],"answer":1,"explain":"ABORT undoes the current statement. ROLLBACK undoes the whole transaction; IGNORE skips the row silently; FAIL keeps rows already changed."},
+ {"q":"<code>AFTER UPDATE OF price ON product</code> fires when you run <code>UPDATE product SET price = price WHERE product_id = 1</code>. Why?","options":["It is a bug in SQLite","UPDATE OF fires whenever the column is in the SET list, even if the value does not change","Because price is a REAL column","It does not fire"],"answer":1,"explain":"UPDATE OF is about the SET list, not the value. Add WHEN NEW.price &lt;&gt; OLD.price to act only on real changes."},
+ {"q":"Which condition correctly detects a change of phone number, including a change to or from NULL?","options":["<code>WHEN OLD.phone &lt;&gt; NEW.phone</code>","<code>WHEN OLD.phone != NEW.phone</code>","<code>WHEN OLD.phone IS NOT NEW.phone</code>","<code>WHEN NEW.phone</code>"],"answer":2,"explain":"Comparisons with NULL using &lt;&gt; give NULL (not true). IS NOT is the NULL-safe comparison."},
+ {"q":"Which of these can a SQLite BEFORE INSERT trigger NOT do?","options":["Refuse the row with RAISE","Read other tables with a subquery","Change the value being inserted, e.g. set NEW.unit_price","Insert a row into a log table"],"answer":2,"explain":"SQLite does not allow assignment to NEW. MySQL, PostgreSQL and Oracle do. Use a DEFAULT, an AFTER trigger or an INSTEAD OF trigger on a view instead."},
+ {"q":"A sale updates inventory, and an AFTER UPDATE trigger on inventory then inserts a reorder alert. This is an example of…","options":["a recursive trigger","a cascading trigger","a statement-level trigger","an INSTEAD OF trigger"],"answer":1,"explain":"One trigger’s action fires another trigger on a different table: a cascade. Recursive means a trigger firing itself, which SQLite blocks by default."},
+ {"q":"How does a <code>RAISE(ABORT, …)</code> in a trigger reach a Python program using sqlite3?","options":["As a return value of None","As <code>sqlite3.IntegrityError</code> carrying the message","As <code>KeyError</code>","It is silently ignored"],"answer":1,"explain":"The statement fails with sqlite3.IntegrityError; catch it and show the message to the user."},
+ {"q":"Why does the shop’s <code>audit_log</code> table have no foreign keys?","options":["SQLite does not allow foreign keys on log tables","An audit row must survive even after the audited row is deleted","Foreign keys would make the trigger fire twice","To save disk space"],"answer":1,"explain":"With a foreign key, deleting a customer would be blocked or would cascade-delete their audit history, which defeats the purpose of an audit trail."},
+ {"q":"Which statement about SQLite compared with SQL Server is correct?","options":["Both support BEFORE triggers","SQLite triggers are row-level; SQL Server triggers are statement-level and use the inserted/deleted tables","SQL Server cannot use INSTEAD OF","SQLite supports FOR EACH STATEMENT"],"answer":1,"explain":"SQLite fires once per row with OLD/NEW. SQL Server fires once per statement and exposes the affected rows as inserted and deleted pseudo-tables. It has no BEFORE triggers."},
+ {"q":"Why must the sample orders be loaded <em>before</em> the stock triggers are created?","options":["Triggers cannot be created on tables that already have rows","Otherwise the triggers would subtract stock that was already accounted for and log fake movements","SQLite requires it","It makes no difference"],"answer":1,"explain":"The seed stock levels are already current. Loading history with the triggers active would double-count every sale."}
+]
+</script>
+  </div>
+  <h3 id="exit-ticket">Exit ticket</h3>
+  <ol>
+    <li>Give one business rule from your own project that should be a BEFORE trigger, and one that should be an AFTER trigger.</li>
+    <li>What is the difference between RAISE(ABORT) and RAISE(IGNORE)?</li>
+    <li>Which trigger in the shop do you find hardest to follow? Trace it in the trigger lab.</li>
+  </ol>
+  <h3 id="before-next-week">Before next week</h3>
+  <ul class="checklist" data-id="week02-before">
+    <li><span>Build <code>shop_v2.db</code> and run <code>trigger_demo_v2.py</code>.</span></li>
+    <li><span>Write and test three triggers for your own project (INSERT, UPDATE, DELETE; BEFORE and AFTER).</span></li>
+    <li><span>Add a trigger test to your test plan, with before and after screenshots.</span></li>
+  </ul>
+</section>
+      </div>
+
+<!-- =========================================================== RESOURCES -->
+      <div class="tabpanel" role="tabpanel" id="panel-resources" aria-labelledby="tab-resources" hidden>
+<section class="lsec">
+  <h2 id="resources-downloads">Downloads</h2>
+  <p>Everything needs only the Python standard library.</p>
+  <ul class="dl-list">
+    <li><span class="ext">zip</span><span class="what"><a href="../downloads/week02/qho541_week02_files.zip" download>qho541_week02_files.zip</a><span class="d">All the files below in one download</span></span></li>
+    <li><span class="ext">db</span><span class="what"><a href="../downloads/week02/shop_v2.db" download>shop_v2.db</a><span class="d">Online Shop with 18 triggers, 4 supporting tables and the v_order_lines view</span></span></li>
+    <li><span class="ext">db</span><span class="what"><a href="../downloads/week02/shop_v1.db" download>shop_v1.db</a><span class="d">The Week 1 database without triggers, for the seminar activities</span></span></li>
+    <li><span class="ext">sql</span><span class="what"><a href="../downloads/week02/migration_v2_triggers.sql" download>migration_v2_triggers.sql</a><span class="d">Everything added this week, fully commented</span></span></li>
+    <li><span class="ext">py</span><span class="what"><a href="../downloads/week02/build_shop_db_v2.py" download>build_shop_db_v2.py</a><span class="d">Builds shop_v2.db = schema_v1 + seed_v1 + migration_v2</span></span></li>
+    <li><span class="ext">py</span><span class="what"><a href="../downloads/week02/trigger_demo_v2.py" download>trigger_demo_v2.py</a><span class="d">Lecture worked example: triggers seen from Python, with error handling</span></span></li>
+    <li><span class="ext">sql</span><span class="what"><a href="../downloads/week02/seminar/w2_stock_triggers.sql" download>seminar/w2_stock_triggers.sql</a><span class="d">Activities 2–3 model answer</span></span></li>
+    <li><span class="ext">sql</span><span class="what"><a href="../downloads/week02/seminar/w2_order_totals.sql" download>seminar/w2_order_totals.sql</a><span class="d">Activity 4 model answer</span></span></li>
+    <li><span class="ext">sql</span><span class="what"><a href="../downloads/week02/seminar/w2_restock.sql" download>seminar/w2_restock.sql</a><span class="d">Activity 5 model answer</span></span></li>
+    <li><span class="ext">sql</span><span class="what"><a href="../downloads/week02/seminar/w2_debugging_fixed.sql" download>seminar/w2_debugging_fixed.sql</a><span class="d">Activity 6: the three bugs, fixed</span></span></li>
+  </ul>
+</section>
+<section class="lsec">
+  <h2 id="further-reading">Further learning</h2>
+  <ul>
+    <li>SQLite documentation: <a href="https://www.sqlite.org/lang_createtrigger.html">CREATE TRIGGER</a> · <a href="https://www.sqlite.org/lang_createview.html">CREATE VIEW</a> · <a href="https://www.sqlite.org/pragma.html#pragma_recursive_triggers">PRAGMA recursive_triggers</a> · <a href="https://www.sqlite.org/lang_conflict.html">ON CONFLICT and the RAISE resolutions</a></li>
+    <li>The tutorial linked in the original slides: <a href="https://www.w3resource.com/sqlite/sqlite-triggers.php">w3resource: SQLite triggers</a></li>
+    <li>Other systems, for comparison: <a href="https://www.postgresql.org/docs/current/sql-createtrigger.html">PostgreSQL CREATE TRIGGER</a> · <a href="https://dev.mysql.com/doc/refman/8.0/en/create-trigger.html">MySQL CREATE TRIGGER</a> · <a href="https://learn.microsoft.com/en-us/sql/t-sql/statements/create-trigger-transact-sql">SQL Server CREATE TRIGGER</a></li>
+    <li>Python documentation: <a href="https://docs.python.org/3/library/sqlite3.html#sqlite3.IntegrityError">sqlite3 exceptions</a> and <a href="https://docs.python.org/3/library/sqlite3.html#sqlite3.Connection.backup">Connection.backup</a></li>
+  </ul>
+</section>
+<section class="lsec">
+  <h2 id="glossary">Glossary</h2>
+  <dl class="terms">
+    <dt>Audit trail</dt><dd>An append-only record of changes: what, when, old and new values.</dd>
+    <dt>Cascading trigger</dt><dd>A trigger fired by another trigger’s action.</dd>
+    <dt>ECA</dt><dd>Event → condition → action: the structure of every trigger.</dd>
+    <dt>INSTEAD OF</dt><dd>A trigger that replaces an INSERT, UPDATE or DELETE on a view.</dd>
+    <dt>NEW / OLD</dt><dd>The row after / before the change, inside a row-level trigger.</dd>
+    <dt>RAISE()</dt><dd>Stops or skips the current change from inside a trigger (ABORT, FAIL, ROLLBACK, IGNORE).</dd>
+    <dt>Recursive trigger</dt><dd>A trigger that fires itself. Off by default in SQLite.</dd>
+    <dt>Row-level trigger</dt><dd>Runs once for every row a statement affects (the only kind in SQLite).</dd>
+  </dl>
+</section>
+<section class="lsec">
+  <h2 id="sources">Source materials</h2>
+  <div class="table-wrap"><table class="source-map">
+    <thead><tr><th>Original file</th><th>Used in</th></tr></thead>
+    <tbody>
+      <tr><td>W02_Advanced Database QHO541.pptx</td><td>What is a trigger, benefits and drawbacks, syntax, OLD/NEW table, the emp_log idea (first trigger), the step-by-step stock trigger including the fixed-99 first attempt, IIF and Solutions 1 and 2, Tasks 1–2 (seminar Activities 4 and 7)</td></tr>
+      <tr><td>Week 2 Extra tasks Triggers .pptx</td><td>Seminar Activity 3 (UPDATE and DELETE stock triggers)</td></tr>
+      <tr><td>ex1, db11 (trigger example databases)</td><td>Replaced by shop_v1 / shop_v2, which add the missing primary and foreign keys</td></tr>
+      <tr><td>SQL Query Optimizations.pptx (copy in this folder)</td><td>Week 3</td></tr>
+    </tbody></table></div>
+  <p class="small muted">Corrections made: curly quotes and double-quoted strings in the slide INSERTs, the hard-coded stock value, and the missing COALESCE (NULL trap) in the stock check.</p>
+</section>
+      </div>
+
+      <nav class="pager" aria-label="Lesson navigation">
+        <a href="week01.html"><span class="dir">Previous</span>Week 1 · Normalisation &amp; ER diagrams</a>
+        <a class="next" href="../assessment.html"><span class="dir">Also see</span>Assessment guide</a>
+      </nav>
+      <footer class="site-footer" id="site-footer"></footer>
+    </main>
+    <aside class="toc" id="toc" aria-label="On this page"></aside>
+  </div>
+</div>
+<script src="../assets/vendor/highlight/highlight.min.js"></script>
+<script src="../assets/vendor/codemirror/codemirror.js"></script>
+<script src="../assets/vendor/codemirror/mode/sql.js"></script>
+<script src="../assets/vendor/codemirror/matchbrackets.js"></script>
+<script src="../assets/vendor/sqljs/sql-wasm.js"></script>
+<script src="../assets/js/site.js"></script>
+<script src="../assets/js/erd-models.js"></script>
+<script src="../assets/js/erd.js"></script>
+<script src="../assets/js/sql-playground.js"></script>
+<script src="../assets/js/trigger-lab.js"></script>
+<script src="../assets/js/quiz.js"></script>
+</body>
+</html>
